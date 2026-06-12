@@ -1,0 +1,195 @@
+-- 融媒体管理系统数据库初始化脚本
+-- 使用前请先创建数据库
+
+CREATE DATABASE IF NOT EXISTS photography_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+USE photography_system;
+
+-- 注意：Spring Boot JPA 会自动创建表结构
+-- 以下是参考的表结构，实际以 JPA 自动生成为准
+
+-- 部门表
+-- CREATE TABLE departments (
+--     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+--     name VARCHAR(100) NOT NULL,
+--     type VARCHAR(20) NOT NULL,
+--     description VARCHAR(500),
+--     created_at DATETIME NOT NULL,
+--     updated_at DATETIME,
+--     deleted BOOLEAN DEFAULT FALSE
+-- );
+
+-- 用户表
+-- CREATE TABLE users (
+--     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+--     username VARCHAR(50) NOT NULL UNIQUE,
+--     password VARCHAR(255) NOT NULL,
+--     real_name VARCHAR(50) NOT NULL,
+--     email VARCHAR(100),
+--     phone VARCHAR(20),
+--     student_id VARCHAR(20),
+--     avatar_url VARCHAR(500),
+--     role VARCHAR(10) NOT NULL,
+--     enabled BOOLEAN DEFAULT TRUE,
+--     department_id BIGINT,
+--     created_at DATETIME NOT NULL,
+--     updated_at DATETIME,
+--     deleted BOOLEAN DEFAULT FALSE,
+--     FOREIGN KEY (department_id) REFERENCES departments(id)
+-- );
+
+-- 设备表
+-- CREATE TABLE equipment (
+--     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+--     name VARCHAR(100) NOT NULL,
+--     model VARCHAR(100) NOT NULL,
+--     category VARCHAR(50) NOT NULL,
+--     serial_number VARCHAR(50) NOT NULL UNIQUE,
+--     description TEXT,
+--     price DECIMAL(10,2),
+--     purchase_date DATE,
+--     image_urls TEXT,
+--     stock_quantity INT NOT NULL,
+--     available_quantity INT NOT NULL,
+--     location VARCHAR(100),
+--     status VARCHAR(20) DEFAULT '正常',
+--     specifications TEXT,
+--     created_at DATETIME NOT NULL,
+--     updated_at DATETIME,
+--     deleted BOOLEAN DEFAULT FALSE
+-- );
+
+-- 借还记录表
+-- CREATE TABLE borrow_records (
+--     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+--     user_id BIGINT NOT NULL,
+--     equipment_id BIGINT NOT NULL,
+--     quantity INT NOT NULL,
+--     expected_return_time DATETIME NOT NULL,
+--     actual_return_time DATETIME,
+--     status VARCHAR(20) NOT NULL,
+--     borrow_reason VARCHAR(500),
+--     approval_notes VARCHAR(500),
+--     approved_by BIGINT,
+--     approval_time DATETIME,
+--     return_notes VARCHAR(500),
+--     damage_description VARCHAR(500),
+--     created_at DATETIME NOT NULL,
+--     updated_at DATETIME,
+--     deleted BOOLEAN DEFAULT FALSE,
+--     FOREIGN KEY (user_id) REFERENCES users(id),
+--     FOREIGN KEY (equipment_id) REFERENCES equipment(id),
+--     FOREIGN KEY (approved_by) REFERENCES users(id)
+-- );
+
+-- 公告表
+-- CREATE TABLE announcements (
+--     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+--     title VARCHAR(200) NOT NULL,
+--     content TEXT NOT NULL,
+--     created_by BIGINT NOT NULL,
+--     published BOOLEAN DEFAULT FALSE,
+--     priority INT DEFAULT 0,
+--     view_count BIGINT DEFAULT 0,
+--     created_at DATETIME NOT NULL,
+--     updated_at DATETIME,
+--     deleted BOOLEAN DEFAULT FALSE,
+--     FOREIGN KEY (created_by) REFERENCES users(id)
+-- );
+
+-- 晚自习打卡配置表
+-- CREATE TABLE study_checkin_configs (
+--     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+--     location VARCHAR(100) NOT NULL,
+--     start_time TIME NOT NULL,
+--     end_time TIME NOT NULL,
+--     active BOOLEAN DEFAULT TRUE,
+--     description VARCHAR(500),
+--     created_at DATETIME NOT NULL,
+--     updated_at DATETIME,
+--     deleted BOOLEAN DEFAULT FALSE
+-- );
+
+-- 晚自习打卡记录表
+-- CREATE TABLE study_checkins (
+--     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+--     user_id BIGINT NOT NULL,
+--     checkin_date DATE NOT NULL,
+--     checkin_time DATETIME NOT NULL,
+--     location VARCHAR(100) NOT NULL,
+--     device_info VARCHAR(200),
+--     ip_address VARCHAR(45),
+--     notes VARCHAR(500),
+--     created_at DATETIME NOT NULL,
+--     updated_at DATETIME,
+--     deleted BOOLEAN DEFAULT FALSE,
+--     FOREIGN KEY (user_id) REFERENCES users(id),
+--     UNIQUE KEY unique_user_date_device (user_id, checkin_date, device_info)
+-- );
+
+-- 执勤排班表
+-- CREATE TABLE duty_schedules (
+--     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+--     user_id BIGINT NOT NULL,
+--     day_of_week INT NOT NULL,
+--     start_time TIME NOT NULL,
+--     end_time TIME NOT NULL,
+--     active BOOLEAN DEFAULT TRUE,
+--     notes VARCHAR(500),
+--     created_at DATETIME NOT NULL,
+--     updated_at DATETIME,
+--     deleted BOOLEAN DEFAULT FALSE,
+--     FOREIGN KEY (user_id) REFERENCES users(id),
+--     UNIQUE KEY unique_user_schedule (user_id, day_of_week, start_time)
+-- );
+
+-- 执勤记录表
+-- CREATE TABLE duty_records (
+--     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+--     user_id BIGINT NOT NULL,
+--     duty_schedule_id BIGINT NOT NULL,
+--     duty_date DATE NOT NULL,
+--     checkin_time DATETIME,
+--     checkout_time DATETIME,
+--     actual_start_time DATETIME,
+--     actual_end_time DATETIME,
+--     status VARCHAR(20) DEFAULT '待执勤',
+--     notes VARCHAR(500),
+--     created_at DATETIME NOT NULL,
+--     updated_at DATETIME,
+--     deleted BOOLEAN DEFAULT FALSE,
+--     FOREIGN KEY (user_id) REFERENCES users(id),
+--     FOREIGN KEY (duty_schedule_id) REFERENCES duty_schedules(id)
+-- );
+
+-- 请假申请表
+-- CREATE TABLE leave_requests (
+--     id BIGINT PRIMARY KEY AUTO_INCREMENT,
+--     user_id BIGINT NOT NULL,
+--     leave_type VARCHAR(50) NOT NULL,
+--     leave_date DATE NOT NULL,
+--     reason VARCHAR(500) NOT NULL,
+--     status VARCHAR(20) NOT NULL,
+--     approved_by BIGINT,
+--     approval_time DATETIME,
+--     approval_notes VARCHAR(500),
+--     reference_id BIGINT,
+--     reference_type VARCHAR(50),
+--     created_at DATETIME NOT NULL,
+--     updated_at DATETIME,
+--     deleted BOOLEAN DEFAULT FALSE,
+--     FOREIGN KEY (user_id) REFERENCES users(id),
+--     FOREIGN KEY (approved_by) REFERENCES users(id)
+-- );
+
+-- 创建索引以提高查询性能
+-- CREATE INDEX idx_users_username ON users(username);
+-- CREATE INDEX idx_users_department ON users(department_id);
+-- CREATE INDEX idx_equipment_category ON equipment(category);
+-- CREATE INDEX idx_equipment_serial ON equipment(serial_number);
+-- CREATE INDEX idx_borrow_user ON borrow_records(user_id);
+-- CREATE INDEX idx_borrow_equipment ON borrow_records(equipment_id);
+-- CREATE INDEX idx_borrow_status ON borrow_records(status);
+-- CREATE INDEX idx_announcement_published ON announcements(published);
+-- CREATE INDEX idx_checkin_user_date ON study_checkins(user_id, checkin_date);
+-- CREATE INDEX idx_duty_user_date ON duty_records(user_id, duty_date);

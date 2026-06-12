@@ -1,0 +1,119 @@
+spring:
+  application:
+    name: Photography
+  
+  # 生产环境数据库配置
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/photography_system?useUnicode=true&characterEncoding=utf8&useSSL=true&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:photography_system}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    
+    # 连接池配置
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      auto-commit: true
+      idle-timeout: 30000
+      pool-name: DatebookHikariCP
+      max-lifetime: 1800000
+      connection-timeout: 30000
+    
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: validate  # 生产环境使用validate，避免自动修改表结构
+    show-sql: false       # 生产环境关闭SQL日志
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: false
+        use_sql_comments: false
+        # 性能优化
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    open-in-view: false
+    
+  # 文件上传配置
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 100MB
+      
+  # 静态资源配置
+  web:
+    resources:
+      static-locations: file:${file.upload.path}
+      cache:
+        period: 3600  # 1小时缓存
+
+# JWT配置 
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: 86400000 # 24小时
+
+# 应用配置
+app:
+  admin:
+    secret-key: ${ADMIN_SECRET_KEY}
+
+# 文件上传路径（生产环境使用绝对路径）
+file:
+  upload:
+    path: /www/photography/uploads/
+    avatar-path: avatars/
+    equipment-path: equipment/
+    return-path: returns/
+    site-path: site/
+
+# 服务器配置
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json
+    min-response-size: 1024
+
+# 日志配置
+logging:
+  level:
+    com.example.photography: INFO
+    org.hibernate.SQL: WARN
+    org.springframework.security: WARN
+    root: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: /www/photography/logs/application.log
+    max-size: 100MB
+    max-history: 30
+
+# Swagger配置（生产环境可以禁用）
+springdoc:
+  api-docs:
+    enabled: false  # 生产环境建议禁用
+  swagger-ui:
+    enabled: false  # 生产环境建议禁用
+    
+# 跨域配置（根据你的域名调整）
+cors:
+  allowed-origins: "https://rongmeiti.xyz,http://rongmeiti.xyz,https://www.rongmeiti.xyz,http://www.rongmeiti.xyz,http://154.201.64.220"
+  allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
+  allowed-headers: "*"
+  allow-credentials: true
+
+# 监控配置（可选）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized

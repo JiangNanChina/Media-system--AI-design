@@ -1,0 +1,105 @@
+spring:
+  application:
+    name: Photography
+  
+  # 数据库配置
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/photography_system?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+    open-in-view: false
+    
+  # 文件上传配置
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 100MB
+      
+  # 静态资源配置
+  web:
+    resources:
+      static-locations: classpath:/static/
+      
+  # Jackson配置
+  jackson:
+    serialization:
+      fail-on-empty-beans: false
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    default-property-inclusion: non_null
+
+# JWT配置
+jwt:
+  secret: ${JWT_SECRET:change-me-to-a-strong-512-bit-secret-before-deploy}
+  expiration: 86400000 # 24小时
+
+# 应用配置
+app:
+  admin:
+    secret-key: ${ADMIN_SECRET_KEY:change-me-before-deploy}  # 管理员注册密钥
+  
+# 文件上传路径（开发环境使用相对路径）
+file:
+  upload:
+    path: uploads/
+    avatar-path: avatars/
+    equipment-path: equipment/
+    return-path: returns/
+
+# 服务器配置
+server:
+  port: 8080
+  servlet:
+    context-path: /api  # 为所有接口添加 /api 前缀，与前端请求路径匹配
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json,image/svg+xml
+    min-response-size: 1024
+
+# 日志配置
+logging:
+  level:
+    com.example.photography: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.security: DEBUG
+    org.springframework.web.cors: DEBUG
+
+# Swagger配置
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+  # 注意：由于配置了context-path为 /api，Swagger UI 的实际访问路径是 /api/swagger-ui.html
+    
+# 跨域配置
+cors:
+  allowed-origins: "http://localhost:3000,http://localhost:3001,http://localhost:5173,https://scemi-media.top,http://scemi-media.top,https://www.scemi-media.top,http://www.scemi-media.top"
+  allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
+  allowed-headers: "*"
+  allow-credentials: true
+
+# 高德地图API配置
+amap:
+  web-api-key: ${AMAP_WEB_API_KEY:}  # 高德Web服务API Key
+  js-api-key: ${AMAP_JS_API_KEY:}    # 高德JS API Key
+  base-url: https://restapi.amap.com
+  geocoding-url: /v3/geocode/geo
+  reverse-geocoding-url: /v3/geocode/regeo
+  place-search-url: /v3/place/text
+  direction-url: /v3/direction/driving
+  ip-location-url: /v3/ip
+  static-map-url: /v3/staticmap

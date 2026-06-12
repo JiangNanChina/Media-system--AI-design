@@ -1,0 +1,53 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DATABASE_TO_UPPER=false;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+  sql:
+    init:
+      mode: never
+
+logging:
+  level:
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+
+server:
+  port: 0
+
+# 文件上传（测试环境使用相对路径，防止依赖外部磁盘路径）
+file:
+  upload:
+    path: uploads/
+    avatar-path: avatars/
+    equipment-path: equipment/
+    return-path: returns/
+
+# CORS（测试环境给出安全的默认值）
+cors:
+  allowed-origins: "http://localhost:5173,http://localhost:3000"
+  allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
+  allowed-headers: "*"
+  allow-credentials: true
+
+# JWT（测试环境沿用默认并保证可用）
+jwt:
+  secret: test-only-jwt-secret-that-is-not-used-outside-local-tests
+  expiration: 86400000
+
+app:
+  admin:
+    secret-key: test-admin-secret
+  upload:
+    site-assets-dir: site
+
