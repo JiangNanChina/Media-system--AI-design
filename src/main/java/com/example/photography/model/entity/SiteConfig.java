@@ -199,5 +199,55 @@ public class SiteConfig extends BaseEntity {
          * 设备逾期归还提醒开关
          */
         public static final String MAIL_BORROW_OVERDUE_REMINDER_ENABLED = "mail.borrow_overdue_reminder_enabled";
+
+        public static final String LANDING_HERO_TITLE = "landing.hero.title";
+        public static final String LANDING_HERO_SUBTITLE = "landing.hero.subtitle";
+        public static final String LANDING_HERO_MEDIA = "landing.hero.media";
+        public static final String LANDING_HERO_MEDIA_TYPE = "landing.hero.media_type";
+        public static final String LANDING_BRAND_TITLE = "landing.brand.title";
+        public static final String LANDING_NAV_HOME_LABEL = "landing.nav.home_label";
+        public static final String LANDING_NAV_FEATURES_LABEL = "landing.nav.features_label";
+        public static final String LANDING_NAV_SHOWCASE_LABEL = "landing.nav.showcase_label";
+        public static final String LANDING_NAV_SUBMISSION_LABEL = "landing.nav.submission_label";
+        public static final String LANDING_HERO_BADGE = "landing.hero.badge";
+        public static final String LANDING_HERO_PRIMARY_CTA = "landing.hero.primary_cta";
+        public static final String LANDING_HERO_SECONDARY_CTA = "landing.hero.secondary_cta";
+        public static final String LANDING_FEATURES_EYEBROW = "landing.features.eyebrow";
+        public static final String LANDING_FEATURES_TITLE = "landing.features.title";
+        public static final String LANDING_FEATURES_DESCRIPTION = "landing.features.description";
+        public static final String LANDING_SHOWCASE_EYEBROW = "landing.showcase.eyebrow";
+        public static final String LANDING_SHOWCASE_TITLE = "landing.showcase.title";
+        public static final String LANDING_SHOWCASE_DESCRIPTION = "landing.showcase.description";
+        public static final String LANDING_SUBMISSION_EYEBROW = "landing.submission.eyebrow";
+        public static final String LANDING_SUBMISSION_TITLE = "landing.submission.title";
+        public static final String LANDING_SUBMISSION_DESCRIPTION = "landing.submission.description";
+        public static final String LANDING_SUBMISSION_PRIMARY_CTA = "landing.submission.primary_cta";
+        public static final String LANDING_SUBMISSION_SECONDARY_CTA = "landing.submission.secondary_cta";
+        public static final String LANDING_SUBMISSION_VISUAL_BADGE = "landing.submission.visual_badge";
+        public static final String LANDING_SUBMISSION_STEP_ONE = "landing.submission.step_one";
+        public static final String LANDING_SUBMISSION_STEP_TWO = "landing.submission.step_two";
+        public static final String LANDING_SUBMISSION_STEP_THREE = "landing.submission.step_three";
+        public static final String LANDING_SUBMISSION_TOPIC_ONE_TITLE = "landing.submission.topic_one.title";
+        public static final String LANDING_SUBMISSION_TOPIC_ONE_SUMMARY = "landing.submission.topic_one.summary";
+        public static final String LANDING_SUBMISSION_TOPIC_TWO_TITLE = "landing.submission.topic_two.title";
+        public static final String LANDING_SUBMISSION_TOPIC_TWO_SUMMARY = "landing.submission.topic_two.summary";
+        public static final String LANDING_SUBMISSION_TOPIC_THREE_TITLE = "landing.submission.topic_three.title";
+        public static final String LANDING_SUBMISSION_TOPIC_THREE_SUMMARY = "landing.submission.topic_three.summary";
+        public static final String LANDING_CONTACT = "landing.contact";
+        public static final String LANDING_CONTACT_EMAIL = "landing.contact.email";
+        public static final String LANDING_CONTACT_PHONE = "landing.contact.phone";
+        public static final String LANDING_CONTACT_ADDRESS = "landing.contact.address";
+        public static final String LANDING_DOUYIN_URL = "landing.social.douyin_url";
+        public static final String LANDING_WECHAT_URL = "landing.social.wechat_url";
+        public static final String LANDING_WECHAT_QR = "landing.social.wechat_qr";
+        public static final String LANDING_WEBSITE_URL = "landing.social.website_url";
+        public static final String LANDING_FOOTER_DESCRIPTION = "landing.footer.description";
+        public static final String LANDING_FOOTER_SOCIAL_TITLE = "landing.footer.social_title";
+        public static final String LANDING_FOOTER_CONTACT_TITLE = "landing.footer.contact_title";
+        public static final String LANDING_FOOTER_COPYRIGHT_SUFFIX = "landing.footer.copyright_suffix";
+        public static final String MAINTENANCE_ENABLED = "maintenance.enabled";
+        public static final String MAINTENANCE_TITLE = "maintenance.title";
+        public static final String MAINTENANCE_MESSAGE = "maintenance.message";
+        public static final String MAINTENANCE_PASSWORD_HASH = "maintenance.password_hash";
     }
 }

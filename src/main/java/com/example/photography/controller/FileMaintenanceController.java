@@ -18,7 +18,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/admin/file-maintenance")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasRole('SUPER_ADMIN')")
 public class FileMaintenanceController {
 
     private static final Logger logger = LoggerFactory.getLogger(FileMaintenanceController.class);

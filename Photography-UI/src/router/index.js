@@ -1,4 +1,5 @@
 import { useUserStore } from '@/stores/user'
+import request from '@/utils/request'
 
 // 页面组件懒加载
 const Auth = () => import('@/views/Login.vue')  // 现在Login.vue是统一的认证页面
@@ -26,8 +27,39 @@ const SiteConfigManagement = () => import('@/views/SiteConfigManagement.vue')
 const Profile = () => import('@/views/Profile.vue')
 const NotFound = () => import('@/views/NotFound.vue')
 const LoginTest = () => import('@/views/LoginTest.vue')
+const Landing = () => import('@/views/Landing.vue')
+const VideoSubmission = () => import('@/views/VideoSubmission.vue')
+const ForgotPassword = () => import('@/views/ForgotPassword.vue')
+const Maintenance = () => import('@/views/Maintenance.vue')
+const SubmissionManagement = () => import('@/views/SubmissionManagement.vue')
+const LandingManagement = () => import('@/views/LandingManagement.vue')
+const AccountReview = () => import('@/views/AccountReview.vue')
 
 const routes = [
+  {
+    path: '/',
+    name: 'Landing',
+    component: Landing,
+    meta: { public: true, title: '校融媒体中心' }
+  },
+  {
+    path: '/submission',
+    name: 'VideoSubmission',
+    component: VideoSubmission,
+    meta: { public: true, title: '视频投稿' }
+  },
+  {
+    path: '/forgot-password',
+    name: 'ForgotPassword',
+    component: ForgotPassword,
+    meta: { public: true, title: '找回密码' }
+  },
+  {
+    path: '/maintenance',
+    name: 'Maintenance',
+    component: Maintenance,
+    meta: { public: true, title: '系统维护' }
+  },
   {
     path: '/login',
     name: 'Login',
@@ -47,42 +79,41 @@ const routes = [
     meta: { requiresAuth: false, title: '登录测试' }
   },
   {
-    path: '/',
+    path: '/dashboard',
     component: Layout,
-    redirect: '/dashboard',
     meta: { requiresAuth: true },
     children: [
       {
-        path: 'dashboard',
+        path: '',
         name: 'Dashboard',
         component: Dashboard,
         meta: { title: '首页', icon: 'Odometer' }
-      },
-      {
-        path: 'profile',
-        name: 'Profile',
-        component: Profile,
-        meta: { title: '个人中心', icon: 'User', hidden: true }
-      },
-      {
-        path: 'announcement/:id',
-        name: 'PublicAnnouncementDetail',
-        component: AnnouncementDetail,
-        meta: { title: '公告详情', icon: 'Document', hidden: true }
       }
     ]
+  },
+  {
+    path: '/profile',
+    component: Layout,
+    meta: { requiresAuth: true },
+    children: [{ path: '', name: 'Profile', component: Profile, meta: { title: '个人中心', hidden: true } }]
   },
   {
     path: '/user',
     component: Layout,
     redirect: '/user/list',
-    meta: { requiresAuth: true, requiresAdmin: true, title: '用户管理', icon: 'UserFilled' },
+    meta: { requiresAuth: true, roles: ['MINISTER', 'DIRECTOR', 'SUPER_ADMIN', 'ADMIN'], title: '用户管理', icon: 'UserFilled' },
     children: [
       {
         path: 'list',
         name: 'UserManagement',
         component: UserManagement,
         meta: { title: '用户列表', icon: 'User' }
+      },
+      {
+        path: 'review',
+        name: 'AccountReview',
+        component: AccountReview,
+        meta: { title: '注册审核', icon: 'CircleCheck', roles: ['SUPER_ADMIN', 'ADMIN'] }
       }
     ]
   },
@@ -90,7 +121,7 @@ const routes = [
     path: '/department',
     component: Layout,
     redirect: '/department/list',
-    meta: { requiresAuth: true, requiresAdmin: true, title: '部门管理', icon: 'OfficeBuilding' },
+    meta: { requiresAuth: true, roles: ['DIRECTOR', 'SUPER_ADMIN', 'ADMIN'], title: '部门管理', icon: 'OfficeBuilding' },
     children: [
       {
         path: 'list',
@@ -272,15 +303,37 @@ const routes = [
         path: 'admin',
         name: 'DeviceManagement',
         component: DeviceManagement,
-        meta: { title: '设备管理', icon: 'Setting', requiresAdmin: true }
+        meta: { title: '设备管理', icon: 'Setting', roles: ['SUPER_ADMIN', 'ADMIN'] }
       },
       {
         path: 'site-config',
         name: 'SiteConfigManagement',
         component: SiteConfigManagement,
-        meta: { title: '站点配置', icon: 'Tools', requiresAdmin: true }
+        meta: { title: '站点配置', icon: 'Tools', roles: ['SUPER_ADMIN', 'ADMIN'] }
+      },
+      {
+        path: 'landing-config',
+        name: 'LandingManagement',
+        component: LandingManagement,
+        meta: { title: '落地页设置', icon: 'Picture', roles: ['SUPER_ADMIN', 'ADMIN'] }
       }
     ]
+  },
+  {
+    path: '/submission-management',
+    component: Layout,
+    meta: {
+      requiresAuth: true,
+      roles: ['MINISTER', 'DIRECTOR', 'SUPER_ADMIN', 'ADMIN'],
+      title: '投稿管理',
+      icon: 'VideoCamera'
+    },
+    children: [{
+      path: '',
+      name: 'SubmissionManagement',
+      component: SubmissionManagement,
+      meta: { title: '视频投稿', icon: 'VideoCamera' }
+    }]
   },
   {
     path: '/404',
@@ -299,7 +352,7 @@ export default routes
 
 // 路由守卫
 export const setupRouterGuards = (router) => {
-  router.beforeEach((to, from, next) => {
+  router.beforeEach(async (to, from, next) => {
     const userStore = useUserStore()
     
     // 设置页面标题
@@ -309,6 +362,18 @@ export const setupRouterGuards = (router) => {
       document.title = `${to.meta.title} - ${siteTitle}`
     }
     
+    if (!to.meta.public && to.path !== '/maintenance') {
+      try {
+        const maintenance = await request.get('/maintenance/public/status', { silent: true })
+        if (maintenance.data?.enabled && !maintenance.data?.unlocked) {
+          next({ path: '/maintenance', query: { redirect: to.fullPath } })
+          return
+        }
+      } catch {
+        // The target request will surface connectivity errors.
+      }
+    }
+
     // 检查是否需要登录
     if (to.meta.requiresAuth) {
       // 检查token有效性
@@ -325,15 +390,20 @@ export const setupRouterGuards = (router) => {
       }
     }
     
-    // 检查管理员权限
-    if (to.meta.requiresAdmin && !userStore.isAdmin) {
+    const requiredRoles = to.meta.roles || to.matched.flatMap(record => record.meta.roles || [])
+    if (requiredRoles.length && !requiredRoles.includes(userStore.role)) {
+      next('/404')
+      return
+    }
+
+    if (to.meta.requiresAdmin && !userStore.canManageBusiness) {
       next('/404')
       return
     }
     
     // 已登录用户访问登录页或注册页，重定向到首页
     if ((to.path === '/login' || to.path === '/register') && userStore.isLoggedIn) {
-      next('/')
+      next('/dashboard')
       return
     }
     

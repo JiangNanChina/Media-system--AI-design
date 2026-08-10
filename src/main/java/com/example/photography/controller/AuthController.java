@@ -3,18 +3,28 @@ package com.example.photography.controller;
 import com.example.photography.dto.request.LoginRequest;
 import com.example.photography.dto.request.EmailCodeRequest;
 import com.example.photography.dto.request.RegisterRequest;
+import com.example.photography.dto.request.PasswordResetRequest;
 import com.example.photography.dto.response.ApiResponse;
 import com.example.photography.dto.response.LoginResponse;
 import com.example.photography.dto.response.RegisterResponse;
 import com.example.photography.service.AuthService;
 import com.example.photography.service.EmailVerificationService;
 import com.example.photography.service.UserService;
+import com.example.photography.service.RefreshTokenService;
+import com.example.photography.service.PasswordResetService;
+import com.example.photography.service.VerificationRequestLimiter;
+import com.example.photography.service.VerificationCodeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.Cookie;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.*;
+
+import java.time.Duration;
+import java.util.Arrays;
 
 /**
  * 认证控制器
@@ -32,10 +42,22 @@ public class AuthController {
 
     @Autowired
     private EmailVerificationService emailVerificationService;
+
+    @Autowired
+    private RefreshTokenService refreshTokenService;
+
+    @Autowired
+    private PasswordResetService passwordResetService;
+
+    @Autowired
+    private VerificationRequestLimiter verificationRequestLimiter;
+
+    @org.springframework.beans.factory.annotation.Value("${app.security.cookie-secure:true}")
+    private boolean cookieSecure;
     
     @PostMapping("/login")
     @Operation(summary = "用户登录", description = "使用用户名或邮箱和密码登录系统")
-    public ApiResponse<LoginResponse> login(
+    public ResponseEntity<ApiResponse<LoginResponse>> login(
             @Valid @RequestBody LoginRequest request,
             @RequestHeader(value = "X-Forwarded-For", required = false) String xForwardedFor,
             @RequestHeader(value = "X-Real-IP", required = false) String xRealIp,
@@ -46,26 +68,49 @@ public class AuthController {
             String ipAddress = getClientIpAddress(httpRequest, xForwardedFor, xRealIp);
             
             LoginResponse response = authService.login(request, ipAddress, userAgent);
-            return ApiResponse.success("登录成功", response);
+            RefreshTokenService.IssuedRefreshToken refresh = refreshTokenService.issue(response.getUserId());
+            return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, refreshCookie(refresh.rawToken(), httpRequest).toString())
+                    .body(ApiResponse.success("登录成功", response));
         } catch (Exception e) {
-            return ApiResponse.error(e.getMessage());
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
         }
     }
     
     @PostMapping("/refresh")
     @Operation(summary = "刷新令牌", description = "使用现有令牌刷新获取新令牌")
-    public ApiResponse<LoginResponse> refreshToken(@RequestHeader("Authorization") String authorization) {
+    public ResponseEntity<ApiResponse<LoginResponse>> refreshToken(HttpServletRequest request) {
         try {
-            if (authorization == null || !authorization.startsWith("Bearer ")) {
-                return ApiResponse.error("令牌格式错误");
-            }
-            
-            String token = authorization.substring(7);
-            LoginResponse response = authService.refreshToken(token);
-            return ApiResponse.success("令牌刷新成功", response);
+            String raw = readCookie(request, "refresh_token");
+            RefreshTokenService.IssuedRefreshToken refresh = refreshTokenService.rotate(raw);
+            LoginResponse response = authService.issueAccessToken(refresh.user().getId());
+            return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, refreshCookie(refresh.rawToken(), request).toString())
+                    .body(ApiResponse.success("令牌刷新成功", response));
         } catch (Exception e) {
-            return ApiResponse.error(e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(e.getMessage()));
         }
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(HttpServletRequest request) {
+        refreshTokenService.revoke(readCookie(request, "refresh_token"));
+        ResponseCookie clear = ResponseCookie.from("refresh_token", "").httpOnly(true)
+                .secure(cookieSecure).sameSite("Lax").path("/api/auth").maxAge(Duration.ZERO).build();
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, clear.toString()).body(ApiResponse.success("已退出登录"));
+    }
+
+    @PostMapping("/password-reset/email-code")
+    public ApiResponse<Void> sendPasswordResetCode(@Valid @RequestBody EmailCodeRequest request,
+                                                    HttpServletRequest httpRequest) {
+        verificationRequestLimiter.check(request.getEmail(), VerificationCodeService.PASSWORD_RESET,
+                getClientIpAddress(httpRequest, httpRequest.getHeader("X-Forwarded-For"), httpRequest.getHeader("X-Real-IP")));
+        passwordResetService.sendCode(request.getEmail());
+        return ApiResponse.success("如果该邮箱已注册，验证码将发送到邮箱");
+    }
+
+    @PostMapping("/password-reset")
+    public ApiResponse<Void> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
+        passwordResetService.reset(request);
+        return ApiResponse.success("密码已重置，请重新登录");
     }
     
     @GetMapping("/me")
@@ -108,23 +153,15 @@ public class AuthController {
 
     @PostMapping("/email-code")
     @Operation(summary = "发送注册邮箱验证码", description = "向注册邮箱发送6位验证码")
-    public ApiResponse<Void> sendEmailCode(@Valid @RequestBody EmailCodeRequest request) {
+    public ApiResponse<Void> sendEmailCode(@Valid @RequestBody EmailCodeRequest request,
+                                           HttpServletRequest httpRequest) {
         try {
+            verificationRequestLimiter.check(request.getEmail(), "REGISTER",
+                    getClientIpAddress(httpRequest, httpRequest.getHeader("X-Forwarded-For"), httpRequest.getHeader("X-Real-IP")));
             emailVerificationService.sendRegisterCode(request.getEmail());
-            return ApiResponse.success("验证码已发送，请查收邮箱");
+            return ApiResponse.success("如邮箱可用于注册，验证码将发送到邮箱");
         } catch (Exception e) {
             return ApiResponse.error(e.getMessage());
-        }
-    }
-    
-    @PostMapping("/validate-admin-key")
-    @Operation(summary = "验证管理员密钥", description = "验证管理员注册密钥是否正确")
-    public ApiResponse<Boolean> validateAdminKey(@RequestBody String secretKey) {
-        try {
-            boolean isValid = authService.validateAdminSecretKey(secretKey);
-            return ApiResponse.success("密钥验证", isValid);
-        } catch (Exception e) {
-            return ApiResponse.success("密钥验证", false);
         }
     }
     
@@ -207,5 +244,16 @@ public class AuthController {
         }
         
         return ipAddress;
+    }
+
+    private ResponseCookie refreshCookie(String token, HttpServletRequest request) {
+        return ResponseCookie.from("refresh_token", token).httpOnly(true).secure(cookieSecure)
+                .sameSite("Lax").path("/api/auth").maxAge(Duration.ofDays(7)).build();
+    }
+
+    private String readCookie(HttpServletRequest request, String name) {
+        if (request.getCookies() == null) return null;
+        return Arrays.stream(request.getCookies()).filter(cookie -> name.equals(cookie.getName()))
+                .map(Cookie::getValue).findFirst().orElse(null);
     }
 }

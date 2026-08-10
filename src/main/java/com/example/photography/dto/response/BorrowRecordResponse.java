@@ -1,6 +1,8 @@
 package com.example.photography.dto.response;
 
 import com.example.photography.model.enums.BorrowStatus;
+import com.example.photography.model.enums.BorrowerType;
+import com.example.photography.model.enums.ExternalBorrowerType;
 
 import java.time.LocalDateTime;
 
@@ -26,6 +28,12 @@ public class BorrowRecordResponse {
     private String returnImages; // 归还图片JSON字符串
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private BorrowerType borrowerType;
+    private ExternalBorrowerType externalBorrowerType;
+    private String externalOrganization;
+    private String externalContactName;
+    private String externalPhone;
+    private String externalEmail;
     
     // 嵌套类：用户信息
     public static class UserInfo {
@@ -235,4 +243,17 @@ public class BorrowRecordResponse {
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
     }
+
+    public BorrowerType getBorrowerType() { return borrowerType; }
+    public void setBorrowerType(BorrowerType borrowerType) { this.borrowerType = borrowerType; }
+    public ExternalBorrowerType getExternalBorrowerType() { return externalBorrowerType; }
+    public void setExternalBorrowerType(ExternalBorrowerType externalBorrowerType) { this.externalBorrowerType = externalBorrowerType; }
+    public String getExternalOrganization() { return externalOrganization; }
+    public void setExternalOrganization(String externalOrganization) { this.externalOrganization = externalOrganization; }
+    public String getExternalContactName() { return externalContactName; }
+    public void setExternalContactName(String externalContactName) { this.externalContactName = externalContactName; }
+    public String getExternalPhone() { return externalPhone; }
+    public void setExternalPhone(String externalPhone) { this.externalPhone = externalPhone; }
+    public String getExternalEmail() { return externalEmail; }
+    public void setExternalEmail(String externalEmail) { this.externalEmail = externalEmail; }
 }

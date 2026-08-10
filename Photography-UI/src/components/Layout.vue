@@ -173,7 +173,7 @@
                 </el-avatar>
                 <div v-if="!isMobile" class="user-details">
                   <span class="user-name">{{ userStore.userName }}</span>
-                  <span class="user-role">{{ userStore.isAdmin ? '管理员' : '成员' }}</span>
+                  <span class="user-role">{{ userStore.userRole }}</span>
                 </div>
                 <el-icon v-if="!isMobile" class="dropdown-icon"><ArrowDown /></el-icon>
               </div>
@@ -351,14 +351,15 @@ const menuItems = [
   },
   {
     path: '/user',
-    meta: { title: '用户管理', icon: 'UserFilled', requiresAdmin: true },
+    meta: { title: '用户管理', icon: 'UserFilled', roles: ['MINISTER', 'DIRECTOR', 'SUPER_ADMIN', 'ADMIN'] },
     children: [
-      { path: '/user/list', meta: { title: '用户列表', icon: 'User' } }
+      { path: '/user/list', meta: { title: '用户列表', icon: 'User' } },
+      { path: '/user/review', meta: { title: '注册审核', icon: 'CircleCheck', roles: ['SUPER_ADMIN', 'ADMIN'] } }
     ]
   },
   {
     path: '/department',
-    meta: { title: '部门管理', icon: 'OfficeBuilding', requiresAdmin: true },
+    meta: { title: '部门管理', icon: 'OfficeBuilding', roles: ['DIRECTOR', 'SUPER_ADMIN', 'ADMIN'] },
     children: [
       { path: '/department/list', meta: { title: '部门列表', icon: 'Management' } }
     ]
@@ -379,7 +380,7 @@ const menuItems = [
   },
   {
     path: '/announcement',
-    meta: { title: '公告管理', icon: 'Bell', requiresAdmin: true },
+    meta: { title: '公告管理', icon: 'Bell', roles: ['MINISTER', 'DIRECTOR', 'SUPER_ADMIN', 'ADMIN'] },
     children: [
       { path: '/announcement/list', meta: { title: '公告列表', icon: 'ChatDotRound' } }
     ]
@@ -417,14 +418,24 @@ const menuItems = [
     meta: { title: '设备管理', icon: 'Monitor' },
     children: [
       { path: '/devices/my', meta: { title: '我的设备', icon: 'Monitor' } },
-      { path: '/devices/admin', meta: { title: '设备管理', icon: 'Setting', requiresAdmin: true } },
-      { path: '/devices/site-config', meta: { title: '站点配置', icon: 'Tools', requiresAdmin: true } }
+      { path: '/devices/admin', meta: { title: '设备管理', icon: 'Setting', roles: ['SUPER_ADMIN', 'ADMIN'] } },
+      { path: '/devices/site-config', meta: { title: '站点配置', icon: 'Tools', roles: ['SUPER_ADMIN', 'ADMIN'] } },
+      { path: '/devices/landing-config', meta: { title: '落地页设置', icon: 'Picture', roles: ['SUPER_ADMIN', 'ADMIN'] } }
     ]
+  },
+  {
+    path: '/submission-management',
+    meta: { title: '投稿管理', icon: 'VideoCamera', roles: ['MINISTER', 'DIRECTOR', 'SUPER_ADMIN', 'ADMIN'] }
   }
 ]
 
 // 过滤菜单路由（根据用户权限）
 const menuRoutes = computed(() => {
+  const allowed = (meta = {}) => {
+    if (meta.roles?.length && !meta.roles.includes(userStore.role)) return false
+    if (meta.requiresAdmin && !userStore.canManageBusiness) return false
+    return true
+  }
   return menuItems.map(item => {
     // 深拷贝菜单项
     const filteredItem = { ...item }
@@ -433,15 +444,14 @@ const menuRoutes = computed(() => {
     if (item.children) {
       filteredItem.children = item.children.filter(child => {
         // 排除需要管理员权限但用户不是管理员的子菜单
-        if (child.meta?.requiresAdmin && !userStore.isAdmin) return false
-        return true
+        return allowed(child.meta)
       })
     }
     
     return filteredItem
   }).filter(item => {
     // 排除需要管理员权限但用户不是管理员的顶级菜单
-    if (item.meta?.requiresAdmin && !userStore.isAdmin) return false
+    if (!allowed(item.meta)) return false
     
     // 如果有子菜单但过滤后没有可见的子菜单，则隐藏整个父菜单
     if (item.children && item.children.length === 0) return false
@@ -603,6 +613,11 @@ const clearCurrentPageReadAnnouncementsCache = () => {
 
 // 获取登录后公告（排除归档的公告）
 const fetchLoginAnnouncements = async () => {
+  const loginSessionId = sessionStorage.getItem('loginSessionId')
+  if (!loginSessionId || sessionStorage.getItem(`announcementShown:${loginSessionId}`) === 'true') {
+    return
+  }
+
   try {
     console.log('开始获取登录公告...')
     
@@ -617,25 +632,9 @@ const fetchLoginAnnouncements = async () => {
     
     if (response.data?.content && response.data.content.length > 0) {
       console.log(`后端返回 ${response.data.content.length} 条公告`)
-      
-      // 获取当前页面已读的公告列表
-      const currentPageReadList = getCurrentPageReadAnnouncements()
-      console.log('当前页面已读公告列表:', currentPageReadList)
-      
-      // 过滤出当前页面未读的公告
-      const unreadAnnouncements = response.data.content.filter(
-        announcement => !currentPageReadList.includes(announcement.id)
-      )
-      
-      console.log(`过滤后未读公告数量: ${unreadAnnouncements.length}`)
-      
-      if (unreadAnnouncements.length > 0) {
-        console.log('显示公告弹窗')
-        loginAnnouncements.value = unreadAnnouncements
-        showLoginAnnouncementPopup()
-      } else {
-        console.log('当前页面中所有公告均已阅读，不显示弹窗')
-      }
+      sessionStorage.setItem(`announcementShown:${loginSessionId}`, 'true')
+      loginAnnouncements.value = [response.data.content[0]]
+      showLoginAnnouncementPopup()
     } else {
       console.log('后端未返回公告数据或数据为空')
     }
@@ -696,7 +695,7 @@ const closeLoginAnnouncementDialog = () => {
     loginAnnouncementTimer = null
   }
   
-  // 标记所有登录公告为当前页面已读（刷新页面后会重新弹出）
+  // 标记本次显式登录展示的公告为已读。
   loginAnnouncements.value.forEach(announcement => {
     markCurrentPageAnnouncementAsRead(announcement.id)
     // 同时调用原来的后端接口标记已读

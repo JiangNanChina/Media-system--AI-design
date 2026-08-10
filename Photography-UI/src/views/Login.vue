@@ -1,5 +1,10 @@
 <template>
   <div class="auth-container" :style="containerStyle">
+    <router-link to="/" class="home-link" aria-label="返回首页">
+      <el-icon><House /></el-icon>
+      <span>返回首页</span>
+    </router-link>
+
     <div class="auth-form">
       <div class="auth-header">
         <h2 class="auth-title animate-title">
@@ -79,6 +84,10 @@
                 </template>
               </el-input>
         </el-form-item>
+
+        <div class="password-actions">
+          <router-link to="/forgot-password">忘记密码</router-link>
+        </div>
         
         <el-form-item class="button-item">
           <el-button
@@ -102,69 +111,10 @@
             class="auth-form-content register-form"
             @keyup.enter="handleRegister"
           >
-            <!-- 注册类型选择 - 全宽 -->
-            <el-form-item prop="role" class="full-width-item">
-              <template #label>
-                <span class="form-label">注册类型</span>
-              </template>
-              <el-radio-group v-model="registerForm.role" @change="handleRoleChange">
-                <el-radio value="MEMBER">
-                  <div class="role-option">
-                    <el-icon><User /></el-icon>
-                    <span>成员注册</span>
-                  </div>
-                </el-radio>
-                <el-radio value="ADMIN">
-                  <div class="role-option">
-                    <el-icon><Setting /></el-icon>
-                    <span>管理员注册</span>
-                  </div>
-                </el-radio>
-              </el-radio-group>
-            </el-form-item>
-            
-            <!-- 管理员密钥（仅管理员注册时显示） - 全宽 -->
-            <transition name="admin-key-slide" appear>
-              <div v-if="registerForm.role === 'ADMIN'" class="admin-key-section full-width-item">
-                <el-form-item prop="adminSecretKey">
-                  <template #label>
-                    <span class="form-label">管理员密钥</span>
-                  </template>
-                  <el-input
-                    v-model="registerForm.adminSecretKey"
-                    type="password"
-                    placeholder="请输入管理员注册密钥"
-                    size="large"
-                    show-password
-                    clearable
-                    @blur="validateAdminKey"
-                    @input="onAdminKeyInput"
-                  >
-                    <template #prefix>
-                      <el-icon><Key /></el-icon>
-                    </template>
-                  </el-input>
-                  <!-- 验证反馈 -->
-                  <transition name="validation-fade" mode="out-in">
-                    <div v-if="adminKeyValidated" key="success" class="validation-success">
-                      <el-icon><CircleCheck /></el-icon>
-                      <span>密钥验证通过</span>
-                    </div>
-                    <div v-else-if="adminKeyError" key="error" class="validation-error">
-                      <el-icon><CircleClose /></el-icon>
-                      <span>{{ adminKeyError }}</span>
-                    </div>
-                  </transition>
-                </el-form-item>
-                
-                <el-divider class="admin-divider" />
-              </div>
-            </transition>
-            
             <!-- 双列布局区域 -->
             <el-row :gutter="12">
               <!-- 左列 -->
-              <el-col :xs="24" :sm="12">
+              <el-col :xs="24" :sm="24">
                 <!-- 用户名 -->
                 <el-form-item prop="username">
                   <template #label>
@@ -254,29 +204,6 @@
                 </el-form-item>
               </el-col>
               
-              <!-- 右列 -->
-              <el-col :xs="24" :sm="12">
-                <!-- 所属部门 -->
-                <el-form-item prop="departmentId">
-                  <template #label>
-                    <span class="form-label">所属部门</span>
-                  </template>
-                  <el-select
-                    v-model="registerForm.departmentId"
-                    placeholder="请选择所属部门"
-                    size="large"
-                    clearable
-                    style="width: 100%"
-                  >
-                <el-option
-                  v-for="department in departments"
-                  :key="department.id || department.name"
-                  :label="department.name || '未知部门'"
-                  :value="department.id"
-                />
-                  </el-select>
-                </el-form-item>
-              </el-col>
             </el-row>
 
             <el-row :gutter="12" class="email-code-row">
@@ -424,11 +351,10 @@ import {
   User, 
   UserFilled, 
   Message, 
-  Lock, 
-  Key, 
+  Lock,
+  House,
   CircleCheck, 
-  CircleClose,
-  Setting
+  CircleClose
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { generateDeviceFingerprint } from '@/utils/deviceFingerprint'
@@ -459,15 +385,12 @@ const siteConfig = reactive({
 const registering = ref(false)
 const showSuccessDialog = ref(false)
 const successMessage = ref('')
-const departments = ref([])
 const usernameChecked = ref(false)
 const usernameExists = ref(false)
 const usernameFormatErrorLogin = ref('')
 const usernameFormatErrorRegister = ref('')
 const emailChecked = ref(false)
 const emailExists = ref(false)
-const adminKeyValidated = ref(false)
-const adminKeyError = ref('')
 const emailCodeSending = ref(false)
 const emailCodeCountdown = ref(0)
 let emailCodeTimer = null
@@ -486,9 +409,7 @@ const registerForm = reactive({
   realName: '',
   email: '',
   emailCode: '',
-  role: 'MEMBER',
-  departmentId: '',
-  adminSecretKey: ''
+  role: 'MEMBER'
 })
 
 // 注册表单验证规则
@@ -515,7 +436,7 @@ const registerRules = {
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, max: 50, message: '密码长度在 6 到 50 个字符', trigger: 'blur' }
+    { min: 8, max: 72, message: '密码长度在 8 到 72 个字符', trigger: 'blur' }
   ],
   confirmPassword: [
     { required: true, message: '请再次输入密码', trigger: 'blur' }
@@ -628,16 +549,6 @@ const canRegister = computed(() => {
     return false
   }
   
-  // 管理员需要验证密钥
-  if (registerForm.role === 'ADMIN' && !adminKeyValidated.value) {
-    return false
-  }
-  
-  // 成员需要部门
-  if (registerForm.role === 'MEMBER' && !registerForm.departmentId) {
-    return false
-  }
-  
   // 密码一致性检查
   if (registerForm.password !== registerForm.confirmPassword) {
     return false
@@ -736,7 +647,7 @@ const containerStyle = computed(() => {
 // 🔧 优化：加载站点配置并预加载背景图片
 const loadSiteConfig = async () => {
   try {
-    const response = await request.get('/site-config/public')
+    const response = await request.get('/site-config/public', { silent: true })
     
     if (response.success && response.data) {
       // 映射配置键到本地数据
@@ -784,46 +695,6 @@ const loadSiteConfig = async () => {
   }
 }
 
-// 🔧 加载部门列表数据
-const loadDepartments = async () => {
-  try {
-    console.log('🏢 开始加载部门列表...')
-    // 使用公开的部门列表API，不需要认证
-    const response = await request.get('/departments/list')
-    
-    console.log('🔍 部门API响应:', response)
-    
-    // 兼容不同的响应格式
-    if (response.success && response.data) {
-      // 标准的ApiResponse格式
-      departments.value = response.data || []
-    } else if (response.data) {
-      // 如果有 data 字段，使用 data.content 或 data
-      departments.value = response.data.content || response.data || []
-    } else if (Array.isArray(response)) {
-      // 如果直接返回数组
-      departments.value = response
-    } else {
-      console.warn('⚠️ 部门数据格式异常:', response)
-      departments.value = []
-    }
-    
-    console.log('✅ 部门列表加载完成:', departments.value.length, '个部门')
-    console.log('📋 部门详情:', departments.value)
-  } catch (error) {
-    console.error('❌ 加载部门列表失败:', error)
-    // 如果获取失败，提供一些默认的部门选项
-    departments.value = [
-      { id: 1, name: '技术部' },
-      { id: 2, name: '市场部' },
-      { id: 3, name: '人事部' },
-      { id: 4, name: '财务部' },
-      { id: 5, name: '运营部' }
-    ]
-    console.log('🔧 使用默认部门列表')
-  }
-}
-
 // 生命周期
 onMounted(() => {
   loadSiteConfig()
@@ -861,7 +732,7 @@ const handleLogin = async () => {
     
     if (result.success) {
       ElMessage.success('登录成功')
-      router.push('/')
+      router.push('/dashboard')
     } else {
       ElMessage.error(result.message || '登录失败')
     }
@@ -935,8 +806,6 @@ const switchToRegister = () => {
   registerForm.email = ''
   registerForm.emailCode = ''
   registerForm.role = 'MEMBER'
-  registerForm.departmentId = ''
-  registerForm.adminSecretKey = ''
   resetEmailCodeState()
   
   // 重置验证状态
@@ -944,8 +813,6 @@ const switchToRegister = () => {
   usernameExists.value = false
   emailChecked.value = false
   emailExists.value = false
-  adminKeyValidated.value = false
-  adminKeyError.value = ''
   
   // 清除表单验证错误
   if (registerFormRef.value) {
@@ -983,18 +850,6 @@ const handleRegister = async () => {
       return
     }
     
-    // 6. 管理员角色需要验证密钥
-    if (registerForm.role === 'ADMIN' && !adminKeyValidated.value) {
-      ElMessage.error('请先验证管理员密钥')
-      return
-    }
-    
-    // 7. 成员角色需要选择部门
-    if (registerForm.role === 'MEMBER' && !registerForm.departmentId) {
-      ElMessage.error('请选择所属部门')
-      return
-    }
-    
     // 8. 开始注册
     registering.value = true
     
@@ -1006,12 +861,10 @@ const handleRegister = async () => {
       realName: registerForm.realName.trim(),
       email: registerForm.email.trim(),
       emailCode: registerForm.emailCode.trim(),
-      role: registerForm.role,
-      departmentId: registerForm.role === 'MEMBER' ? registerForm.departmentId : null,
-      adminSecretKey: registerForm.role === 'ADMIN' ? registerForm.adminSecretKey : null
+      role: 'MEMBER'
     }
     
-    console.log('📤 发送注册请求:', { ...registerData, password: '******', confirmPassword: '******', adminSecretKey: registerData.adminSecretKey ? '******' : null })
+    console.log('📤 发送注册请求:', { ...registerData, password: '******', confirmPassword: '******' })
     
     // 10. 调用注册API
     const response = await request.post('/auth/register', registerData)
@@ -1022,7 +875,7 @@ const handleRegister = async () => {
     if (response.data?.message) {
       successMessage.value = response.data.message
     } else {
-      successMessage.value = `欢迎加入，${registerForm.realName}！`
+      successMessage.value = `申请已提交，${registerForm.realName}，请等待管理员审核。`
     }
     
     // 12. 显示成功对话框
@@ -1036,8 +889,6 @@ const handleRegister = async () => {
     registerForm.email = ''
     registerForm.emailCode = ''
     registerForm.role = 'MEMBER'
-    registerForm.departmentId = ''
-    registerForm.adminSecretKey = ''
     resetEmailCodeState()
     
     // 14. 重置验证状态
@@ -1045,8 +896,6 @@ const handleRegister = async () => {
     usernameExists.value = false
     emailChecked.value = false
     emailExists.value = false
-    adminKeyValidated.value = false
-    adminKeyError.value = ''
     
     // 15. 重置表单验证
     if (registerFormRef.value) {
@@ -1070,91 +919,6 @@ const handleRegister = async () => {
     ElMessage.error(errorMessage)
   } finally {
     registering.value = false
-  }
-}
-
-const handleRoleChange = () => {
-  // 处理角色变化
-  // 切换角色时重置密钥验证状态
-  adminKeyValidated.value = false
-  adminKeyError.value = ''
-}
-
-// 管理员密钥输入时重置验证状态
-const onAdminKeyInput = () => {
-  adminKeyValidated.value = false
-  adminKeyError.value = ''
-}
-
-const validateAdminKey = async () => {
-  // 验证管理员密钥
-  console.log('🔑 开始验证管理员密钥...', registerForm.adminSecretKey)
-  
-  if (!registerForm.adminSecretKey) {
-    adminKeyValidated.value = false
-    adminKeyError.value = ''
-    console.log('❌ 密钥为空，跳过验证')
-    return
-  }
-  
-  try {
-    console.log('📡 调用后端API验证密钥...')
-    // 后端期望直接接收字符串，不是JSON对象
-    const response = await request.post('/auth/validate-admin-key', 
-      registerForm.adminSecretKey,
-      {
-        headers: {
-          'Content-Type': 'text/plain'
-        }
-      }
-    )
-    
-    console.log('✅ API完整响应:', response)
-    console.log('📦 response:', JSON.stringify(response, null, 2))
-    console.log('📦 response.data:', response.data)
-    console.log('📦 typeof response.data:', typeof response.data)
-    
-    // 兼容多种响应格式
-    // 情况1: response.data 直接是 boolean
-    // 情况2: response.data.data 是 boolean
-    // 情况3: response.data.valid 是 boolean
-    // 情况4: response.data.success 是 boolean
-    let isValid = false
-    
-    if (typeof response.data === 'boolean') {
-      isValid = response.data
-      console.log('🔍 检测到布尔值响应:', isValid)
-    } else if (response.data?.data !== undefined) {
-      isValid = response.data.data === true
-      console.log('🔍 从 response.data.data 获取结果:', isValid)
-    } else if (response.data?.valid !== undefined) {
-      isValid = response.data.valid === true
-      console.log('🔍 从 response.data.valid 获取结果:', isValid)
-    } else if (response.data?.success !== undefined) {
-      isValid = response.data.success === true
-      console.log('🔍 从 response.data.success 获取结果:', isValid)
-    }
-    
-    console.log('🔍 最终验证结果:', isValid)
-    
-    if (isValid) {
-      adminKeyValidated.value = true
-      adminKeyError.value = ''
-      console.log('✓ 密钥验证通过')
-      ElMessage.success('管理员密钥验证通过')
-    } else {
-      adminKeyValidated.value = false
-      adminKeyError.value = '管理员密钥不正确'
-      console.log('✗ 密钥不正确')
-      ElMessage.error('管理员密钥不正确')
-    }
-  } catch (error) {
-    console.error('❌ 密钥验证API调用失败:', error)
-    console.error('❌ 错误详情:', error.response)
-    
-    adminKeyValidated.value = false
-    adminKeyError.value = '管理员密钥验证失败，请稍后重试'
-    ElMessage.error('管理员密钥验证失败，请稍后重试')
   }
 }
 
@@ -1299,7 +1063,6 @@ const goToLogin = () => {
 // 组件挂载时的处理
 onMounted(() => {
   loadSiteConfig()
-  loadDepartments()  // 🔧 加载部门数据
   
   // 检查路由参数，如果是从注册页面来的，切换到注册模式
   if (route.path === '/register' || route.query.mode === 'register' || route.meta?.mode === 'register') {
@@ -1313,6 +1076,18 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.password-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: -8px 0 16px;
+  font-size: 14px;
+  color: var(--el-color-primary);
+}
+
+.password-actions a:focus-visible {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 3px;
+}
 /* 现代化认证容器 */
 .auth-container {
   min-height: 100vh;
@@ -3385,6 +3160,438 @@ onUnmounted(() => {
 
   .email-code-button {
     width: 100% !important;
+  }
+}
+
+.home-link {
+  position: fixed;
+  z-index: 20;
+  top: clamp(16px, 3vw, 28px);
+  left: clamp(16px, 3vw, 32px);
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  color: #123044;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(98, 177, 210, 0.22);
+  border-radius: 999px;
+  box-shadow: 0 14px 34px rgba(18, 174, 231, 0.12);
+  backdrop-filter: blur(18px) saturate(1.1);
+  -webkit-backdrop-filter: blur(18px) saturate(1.1);
+  transition: color 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.home-link .el-icon {
+  color: #18a9d0;
+  font-size: 17px;
+}
+
+.home-link:hover,
+.home-link:focus-visible {
+  color: #075f7d;
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(24, 185, 236, 0.42);
+  box-shadow: 0 18px 40px rgba(18, 174, 231, 0.18);
+}
+
+@media (max-width: 640px) {
+  .home-link {
+    top: 12px;
+    left: 12px;
+    min-height: 38px;
+    padding: 0 13px;
+    font-size: 13px;
+  }
+}
+
+/* Auth harmony final pass */
+:global(#app .auth-container) {
+  min-height: 100vh !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: clamp(24px, 5vw, 52px) clamp(16px, 5vw, 48px) !important;
+  overflow: auto !important;
+  filter: none !important;
+  background:
+    radial-gradient(circle at 12% 14%, rgba(37, 184, 242, 0.18), transparent 30%),
+    radial-gradient(circle at 84% 12%, rgba(98, 214, 189, 0.15), transparent 28%),
+    radial-gradient(circle at 78% 88%, rgba(255, 210, 111, 0.12), transparent 30%),
+    linear-gradient(135deg, #fbfdff 0%, #edf8ff 48%, #fbfff8 100%) !important;
+}
+
+:global(#app .auth-form) {
+  display: grid !important;
+  grid-template-columns: minmax(300px, 0.92fr) minmax(420px, 1.08fr) !important;
+  grid-template-rows: auto 1fr !important;
+  align-items: stretch !important;
+  gap: clamp(20px, 3vw, 30px) !important;
+  width: min(100%, 1060px) !important;
+  max-width: none !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: clamp(20px, 3vw, 30px) !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  border: 1px solid rgba(255, 255, 255, 0.82) !important;
+  border-radius: 28px !important;
+  box-shadow: 0 34px 90px rgba(18, 85, 116, 0.14) !important;
+  backdrop-filter: blur(28px) saturate(1.12) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(1.12) !important;
+}
+
+:global(#app .auth-form:has(.register-form)) {
+  grid-template-columns: minmax(300px, 0.88fr) minmax(590px, 1.12fr) !important;
+  width: min(100%, 1120px) !important;
+}
+
+:global(#app .auth-form::before),
+:global(#app .auth-form::after) {
+  display: none !important;
+}
+
+:global(#app .auth-header) {
+  grid-column: 1 !important;
+  grid-row: 1 / span 2 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  min-height: 430px !important;
+  margin: 0 !important;
+  padding: clamp(28px, 3.2vw, 38px) !important;
+  text-align: left !important;
+  overflow: hidden !important;
+  background:
+    radial-gradient(circle at 12% 10%, rgba(37, 184, 242, 0.18), transparent 36%),
+    radial-gradient(circle at 88% 84%, rgba(98, 214, 189, 0.2), transparent 38%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(229, 248, 255, 0.8)) !important;
+  border: 1px solid rgba(255, 255, 255, 0.9) !important;
+  border-radius: 24px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), 0 18px 44px rgba(18, 174, 231, 0.1) !important;
+}
+
+:global(#app .auth-header::before) {
+  content: "" !important;
+  display: block !important;
+  flex: 0 0 auto !important;
+  order: -1 !important;
+  width: 86px !important;
+  height: 5px !important;
+  margin: 0 0 clamp(28px, 5vw, 54px) !important;
+  border-radius: 999px !important;
+  background: linear-gradient(90deg, #25b8f2, #62d6bd, #ffd26f) !important;
+}
+
+:global(#app .auth-header::after) {
+  content: "" !important;
+  display: block !important;
+  flex: 0 0 auto !important;
+  width: min(100%, 220px) !important;
+  height: 132px !important;
+  margin-top: auto !important;
+  border: 1px solid rgba(37, 184, 242, 0.2) !important;
+  border-radius: 24px !important;
+  opacity: 1 !important;
+  background:
+    linear-gradient(rgba(18, 174, 231, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(18, 174, 231, 0.14) 1px, transparent 1px),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.72), rgba(221, 247, 255, 0.58)) !important;
+  background-size: 26px 26px, 26px 26px, auto !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.84), 0 18px 34px rgba(18, 174, 231, 0.1) !important;
+}
+
+:global(#app .auth-header:has(.logo-container)::after) {
+  display: none !important;
+}
+
+:global(#app .auth-title) {
+  max-width: 360px !important;
+  margin: 0 0 16px !important;
+  color: #12384f !important;
+  font-size: clamp(32px, 4vw, 44px) !important;
+  line-height: 1.12 !important;
+  letter-spacing: 0 !important;
+  text-shadow: none !important;
+}
+
+:global(#app .auth-subtitle) {
+  max-width: 340px !important;
+  margin: 0 !important;
+  color: #4f6d82 !important;
+  font-size: 15px !important;
+  line-height: 1.65 !important;
+  text-shadow: none !important;
+}
+
+:global(#app .logo-container) {
+  order: 4 !important;
+  width: min(100%, 220px) !important;
+  height: 132px !important;
+  margin: auto 0 0 !important;
+  border-radius: 24px !important;
+}
+
+:global(#app .site-logo) {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: inherit !important;
+}
+
+:global(#app .mode-tabs) {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  align-self: end !important;
+  width: min(100%, 540px) !important;
+  height: 58px !important;
+  margin: 0 auto !important;
+  padding: 5px !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  border: 1px solid rgba(98, 177, 210, 0.24) !important;
+  border-radius: 999px !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 12px 26px rgba(18, 174, 231, 0.08) !important;
+}
+
+:global(#app .mode-tab) {
+  height: 48px !important;
+  color: #4f6d82 !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  border-radius: 999px !important;
+  transition: color 180ms ease, background 180ms ease !important;
+}
+
+:global(#app .mode-tab.active) {
+  color: #075985 !important;
+  text-shadow: none !important;
+}
+
+:global(#app .tab-indicator) {
+  inset: 5px auto 5px 5px !important;
+  width: calc(50% - 5px) !important;
+  height: auto !important;
+  background: linear-gradient(135deg, #e2f8ff 0%, #c8efff 52%, #dcfff4 100%) !important;
+  border: 1px solid rgba(37, 184, 242, 0.24) !important;
+  border-radius: 999px !important;
+  box-shadow: 0 10px 22px rgba(18, 174, 231, 0.12) !important;
+}
+
+:global(#app .tab-indicator.move-right) {
+  transform: translateX(100%) !important;
+}
+
+:global(#app .form-container) {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  align-self: center !important;
+  width: 100% !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+:global(#app .auth-form-content) {
+  width: min(100%, 540px) !important;
+  margin: 0 auto !important;
+}
+
+:global(#app .auth-form-content .el-form-item) {
+  margin-bottom: 18px !important;
+}
+
+:global(#app .auth-form-content .el-input__wrapper),
+:global(#app .auth-form-content .el-select .el-input__wrapper) {
+  min-height: 50px !important;
+  border-radius: 14px !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(98, 177, 210, 0.22) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.86) !important;
+}
+
+:global(#app .auth-form-content .el-input__wrapper:hover),
+:global(#app .auth-form-content .el-input__wrapper.is-focus) {
+  border-color: rgba(37, 184, 242, 0.52) !important;
+  box-shadow: 0 0 0 4px rgba(37, 184, 242, 0.12) !important;
+}
+
+:global(#app .password-actions) {
+  margin: -4px 0 24px !important;
+  color: #087fc4 !important;
+  font-weight: 700 !important;
+}
+
+:global(#app .auth-btn) {
+  width: 100% !important;
+  height: 50px !important;
+  margin-top: 2px !important;
+  color: #075985 !important;
+  font-size: 16px !important;
+  font-weight: 850 !important;
+  background: linear-gradient(135deg, #e2f8ff 0%, #c8efff 52%, #dcfff4 100%) !important;
+  border: 1px solid rgba(37, 184, 242, 0.38) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 14px 30px rgba(18, 174, 231, 0.14) !important;
+}
+
+:global(#app .auth-btn:hover),
+:global(#app .auth-btn:focus-visible) {
+  color: #056f9a !important;
+  border-color: rgba(37, 184, 242, 0.54) !important;
+  box-shadow: 0 18px 38px rgba(18, 174, 231, 0.18) !important;
+}
+
+:global(#app .auth-form:has(.register-form) .auth-header) {
+  min-height: 430px !important;
+}
+
+:global(#app .auth-form:has(.register-form) .form-container) {
+  align-self: center !important;
+}
+
+:global(#app .auth-form:has(.register-form) .auth-form-content) {
+  width: 100% !important;
+  max-width: none !important;
+}
+
+:global(#app .auth-form:has(.register-form) .register-form) {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  column-gap: 16px !important;
+  row-gap: 0 !important;
+  max-height: none !important;
+  overflow: visible !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+:global(#app .auth-form:has(.register-form) .register-form .el-row) {
+  display: contents !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+:global(#app .auth-form:has(.register-form) .register-form .el-col) {
+  display: block !important;
+  width: auto !important;
+  max-width: none !important;
+  flex: 0 0 auto !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+:global(#app .auth-form:has(.register-form) .register-form .el-form-item) {
+  margin-bottom: 14px !important;
+}
+
+:global(#app .auth-form:has(.register-form) .register-form .el-input__wrapper),
+:global(#app .auth-form:has(.register-form) .register-form .el-select .el-input__wrapper) {
+  min-height: 46px !important;
+  height: 46px !important;
+}
+
+:global(#app .auth-form:has(.register-form) .register-form .full-width-item),
+:global(#app .auth-form:has(.register-form) .register-form .button-item) {
+  grid-column: 1 / -1 !important;
+}
+
+:global(#app .email-code-control) {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 128px !important;
+  gap: 10px !important;
+  width: 100% !important;
+}
+
+:global(#app .email-code-button) {
+  width: 128px !important;
+  height: 46px !important;
+  padding: 0 10px !important;
+  white-space: nowrap !important;
+  border-radius: 14px !important;
+}
+
+:global(#app .email-code-button span) {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+:global(#app .password-strength) {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) 32px !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin: 0 0 14px !important;
+  padding: 10px 12px !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  border: 1px solid rgba(98, 177, 210, 0.18) !important;
+  border-radius: 14px !important;
+}
+
+@media (max-width: 980px) {
+  :global(#app .auth-form),
+  :global(#app .auth-form:has(.register-form)) {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto auto auto !important;
+    width: min(100%, 660px) !important;
+  }
+
+  :global(#app .auth-header),
+  :global(#app .auth-form:has(.register-form) .auth-header) {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    min-height: auto !important;
+  }
+
+  :global(#app .auth-header::after),
+  :global(#app .logo-container) {
+    display: none !important;
+  }
+
+  :global(#app .mode-tabs) {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+  }
+
+  :global(#app .form-container) {
+    grid-column: 1 !important;
+    grid-row: 3 !important;
+  }
+}
+
+@media (max-width: 680px) {
+  :global(#app .auth-container) {
+    place-items: start center !important;
+    padding-top: 72px !important;
+  }
+
+  :global(#app .auth-form:has(.register-form) .register-form) {
+    grid-template-columns: 1fr !important;
+  }
+
+  :global(#app .email-code-control) {
+    grid-template-columns: 1fr !important;
+  }
+
+  :global(#app .email-code-button) {
+    width: 100% !important;
+  }
+
+  :global(#app .password-strength) {
+    grid-template-columns: 1fr !important;
+    align-items: start !important;
   }
 }
 </style>

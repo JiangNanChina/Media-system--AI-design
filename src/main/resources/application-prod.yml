@@ -1,0 +1,35 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+jwt:
+  secret: ${JWT_SECRET}
+
+app:
+  security:
+    config-encryption-key: ${CONFIG_ENCRYPTION_KEY}
+
+maintenance:
+  token-secret: ${MAINTENANCE_TOKEN_SECRET}
+
+file:
+  upload:
+    path: ${UPLOAD_PATH:/www/photography/uploads/}
+  private-upload:
+    path: ${PRIVATE_UPLOAD_PATH:/www/photography/private-uploads/}
+
+logging:
+  level:
+    com.example.photography: INFO
+    org.hibernate.SQL: WARN
+    org.springframework.security: WARN
+

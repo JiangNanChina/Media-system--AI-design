@@ -59,7 +59,7 @@ public class EmailVerificationServiceImpl implements EmailVerificationService {
     public void sendRegisterCode(String email) {
         String normalizedEmail = normalizeEmail(email);
         if (userService.existsByEmail(normalizedEmail)) {
-            throw new RuntimeException("该邮箱已被注册");
+            return;
         }
 
         String code = String.format("%06d", secureRandom.nextInt(1_000_000));

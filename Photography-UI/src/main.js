@@ -23,22 +23,14 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 }
 
 app.use(pinia)
-app.use(router)
 app.use(ElementPlus, {
   locale: zhCn,
 })
+app.use(router)
 
-// 设置路由守卫
-setupRouterGuards(router)
-
-// 应用启动时检查token有效性
 import { useUserStore } from '@/stores/user'
 const userStore = useUserStore()
-
-// 检查本地存储的token是否有效
-if (userStore.token && !userStore.checkTokenValidity()) {
-  console.log('应用启动时发现token已过期，清除本地数据')
-  userStore.logout()
-}
+await userStore.restoreSession()
+setupRouterGuards(router)
 
 app.mount('#app')

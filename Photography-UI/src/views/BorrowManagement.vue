@@ -389,6 +389,10 @@
         class="borrow-request-form"
       >
         <div class="borrow-form-panel">
+          <el-form-item label="借用人类型" prop="borrowerType" class="borrow-form-item">
+            <el-segmented v-model="borrowForm.borrowerType" :options="[{ label: '本人借用', value: 'INTERNAL' }, { label: '代外部人员借用', value: 'EXTERNAL' }]" />
+            <div class="borrow-field-hint">外部借用由当前账号作为经办人，并按当前账号所属部门审核。</div>
+          </el-form-item>
           <el-form-item label="选择设备" prop="equipmentId" class="borrow-form-item equipment-field">
             <el-select
               v-model="borrowForm.equipmentId"
@@ -464,6 +468,14 @@
                 value-format="YYYY-MM-DDTHH:mm:ss"
               />
             </el-form-item>
+          </div>
+
+          <div v-if="borrowForm.borrowerType === 'EXTERNAL'" class="external-borrower-fields">
+            <el-form-item label="外部借用类型" prop="externalBorrowerType"><el-select v-model="borrowForm.externalBorrowerType" placeholder="请选择"><el-option label="学院" value="COLLEGE" /><el-option label="校内部门" value="DEPARTMENT" /><el-option label="老师" value="TEACHER" /></el-select></el-form-item>
+            <el-form-item label="学院、部门或单位" prop="externalOrganization"><el-input v-model.trim="borrowForm.externalOrganization" maxlength="150" /></el-form-item>
+            <el-form-item label="联系人姓名" prop="externalContactName"><el-input v-model.trim="borrowForm.externalContactName" maxlength="80" /></el-form-item>
+            <el-form-item label="联系人手机号" prop="externalPhone"><el-input v-model.trim="borrowForm.externalPhone" maxlength="11" /></el-form-item>
+            <el-form-item label="联系人QQ邮箱" prop="externalEmail"><el-input v-model.trim="borrowForm.externalEmail" type="email" maxlength="120" /></el-form-item>
           </div>
           
           <el-form-item label="借用目的" prop="borrowReason" class="borrow-form-item purpose-field">
@@ -1270,7 +1282,13 @@ const borrowForm = reactive({
   equipmentId: '',
   quantity: 1,
   expectedReturnTime: '',
-  borrowReason: ''
+  borrowReason: '',
+  borrowerType: 'INTERNAL',
+  externalBorrowerType: '',
+  externalOrganization: '',
+  externalContactName: '',
+  externalPhone: '',
+  externalEmail: ''
 })
 
 // 导出表单
@@ -1348,6 +1366,7 @@ const validateBorrowQuantity = (rule, value, callback) => {
 
 // 表单验证规则
 const borrowRules = {
+  borrowerType: [{ required: true, message: '请选择借用人类型', trigger: 'change' }],
   equipmentId: [
     { required: true, message: '请选择设备', trigger: 'change' }
   ],
@@ -1362,7 +1381,12 @@ const borrowRules = {
   borrowReason: [
     { required: true, message: '请填写借用目的', trigger: 'blur' },
     { min: 5, max: 200, message: '借用目的长度在 5 到 200 个字符', trigger: 'blur' }
-  ]
+  ],
+  externalBorrowerType: [{ validator: (_rule, value, callback) => borrowForm.borrowerType !== 'EXTERNAL' || value ? callback() : callback(new Error('请选择外部借用类型')), trigger: 'change' }],
+  externalOrganization: [{ validator: (_rule, value, callback) => borrowForm.borrowerType !== 'EXTERNAL' || value?.trim() ? callback() : callback(new Error('请填写学院、部门或单位')), trigger: 'blur' }],
+  externalContactName: [{ validator: (_rule, value, callback) => borrowForm.borrowerType !== 'EXTERNAL' || value?.trim() ? callback() : callback(new Error('请填写联系人姓名')), trigger: 'blur' }],
+  externalPhone: [{ validator: (_rule, value, callback) => borrowForm.borrowerType !== 'EXTERNAL' || /^1[3-9]\d{9}$/.test(value) ? callback() : callback(new Error('请输入有效手机号')), trigger: 'blur' }],
+  externalEmail: [{ validator: (_rule, value, callback) => borrowForm.borrowerType !== 'EXTERNAL' || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value) ? callback() : callback(new Error('请输入有效邮箱')), trigger: 'blur' }]
 }
 
 const borrowFormRef = ref()
@@ -1572,6 +1596,8 @@ const resetBorrowForm = () => {
   Object.keys(borrowForm).forEach(key => {
     if (key === 'quantity') {
       borrowForm[key] = 1
+    } else if (key === 'borrowerType') {
+      borrowForm[key] = 'INTERNAL'
     } else {
       borrowForm[key] = ''
     }
@@ -1607,7 +1633,13 @@ const handleSubmitBorrow = async () => {
       equipmentId: borrowForm.equipmentId,
       quantity: borrowForm.quantity,
       expectedReturnTime: borrowForm.expectedReturnTime, // ISO字符串格式，后端会自动转换
-      borrowReason: borrowForm.borrowReason
+      borrowReason: borrowForm.borrowReason,
+      borrowerType: borrowForm.borrowerType,
+      externalBorrowerType: borrowForm.borrowerType === 'EXTERNAL' ? borrowForm.externalBorrowerType : null,
+      externalOrganization: borrowForm.borrowerType === 'EXTERNAL' ? borrowForm.externalOrganization : null,
+      externalContactName: borrowForm.borrowerType === 'EXTERNAL' ? borrowForm.externalContactName : null,
+      externalPhone: borrowForm.borrowerType === 'EXTERNAL' ? borrowForm.externalPhone : null,
+      externalEmail: borrowForm.borrowerType === 'EXTERNAL' ? borrowForm.externalEmail : null
     }
     
     console.log('提交借用申请数据:', requestData)
@@ -2241,6 +2273,22 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.external-borrower-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+  padding: 18px;
+  margin-bottom: 18px;
+  background: rgba(21, 133, 173, 0.06);
+  border: 1px solid rgba(21, 133, 173, 0.18);
+  border-radius: 6px;
+}
+
+.external-borrower-fields .el-select { width: 100%; }
+
+@media (max-width: 640px) {
+  .external-borrower-fields { grid-template-columns: 1fr; }
+}
 /* 归还对话框样式 */
 .return-dialog .el-dialog__body {
   padding: 20px;

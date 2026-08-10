@@ -1,6 +1,7 @@
 package com.example.photography.model.entity;
 
 import com.example.photography.model.enums.UserRole;
+import com.example.photography.model.enums.AccountStatus;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
@@ -52,6 +53,19 @@ public class User extends BaseEntity {
     
     @Column(name = "enabled", nullable = false)
     private Boolean enabled = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", nullable = false, length = 20, columnDefinition = "VARCHAR(20) DEFAULT 'ACTIVE'")
+    private AccountStatus accountStatus = AccountStatus.ACTIVE;
+
+    @Column(name = "failed_login_attempts", nullable = false)
+    private Integer failedLoginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private java.time.LocalDateTime lockedUntil;
+
+    @Column(name = "token_version", nullable = false)
+    private Integer tokenVersion = 0;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id")
@@ -147,6 +161,15 @@ public class User extends BaseEntity {
     public void setEnabled(Boolean enabled) {
         this.enabled = enabled;
     }
+
+    public AccountStatus getAccountStatus() { return accountStatus; }
+    public void setAccountStatus(AccountStatus accountStatus) { this.accountStatus = accountStatus; }
+    public Integer getFailedLoginAttempts() { return failedLoginAttempts; }
+    public void setFailedLoginAttempts(Integer failedLoginAttempts) { this.failedLoginAttempts = failedLoginAttempts; }
+    public java.time.LocalDateTime getLockedUntil() { return lockedUntil; }
+    public void setLockedUntil(java.time.LocalDateTime lockedUntil) { this.lockedUntil = lockedUntil; }
+    public Integer getTokenVersion() { return tokenVersion; }
+    public void setTokenVersion(Integer tokenVersion) { this.tokenVersion = tokenVersion; }
     
     public Department getDepartment() {
         return department;

@@ -65,7 +65,7 @@ public class UserDeviceController {
      * 管理员获取所有设备列表（分页）
      */
     @GetMapping("/admin/list")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "获取所有设备", description = "管理员获取系统中所有设备列表")
     public ApiResponse<Page<UserDeviceResponse>> getAllDevices(
             @RequestParam(defaultValue = "0") int page,
@@ -107,7 +107,7 @@ public class UserDeviceController {
      * 管理员强制解绑设备
      */
     @DeleteMapping("/admin/{deviceId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "强制解绑设备", description = "管理员强制解绑指定设备")
     public ApiResponse<Void> adminUnbindDevice(@PathVariable Long deviceId) {
         try {
@@ -122,7 +122,7 @@ public class UserDeviceController {
      * 管理员重置用户设备绑定
      */
     @PostMapping("/admin/reset-user/{userId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "重置用户设备绑定", description = "管理员重置指定用户的所有设备绑定")
     public ApiResponse<Void> resetUserDevices(@PathVariable Long userId) {
         try {
@@ -137,7 +137,7 @@ public class UserDeviceController {
      * 获取设备统计信息
      */
     @GetMapping("/admin/statistics")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "获取设备统计", description = "获取设备使用统计信息")
     public ApiResponse<Map<String, Object>> getDeviceStatistics() {
         try {
@@ -204,7 +204,7 @@ public class UserDeviceController {
      * 清理长时间未活跃的设备
      */
     @PostMapping("/admin/cleanup")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "清理未活跃设备", description = "清理长时间未活跃的设备")
     public ApiResponse<Void> cleanupInactiveDevices() {
         try {
@@ -219,7 +219,7 @@ public class UserDeviceController {
      * 清理未激活设备
      */
     @PostMapping("/admin/cleanup-unbound")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "清理未激活设备", description = "管理员清理所有未激活或已撤销的设备记录")
     public ApiResponse<Void> cleanupUnboundDevices() {
         try {
@@ -234,7 +234,7 @@ public class UserDeviceController {
      * 测试用：创建移动端设备记录
      */
     @PostMapping("/admin/create-test-mobile")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "创建测试移动设备", description = "为演示目的创建一个测试移动设备记录")
     public ApiResponse<Void> createTestMobileDevice() {
         try {
@@ -249,7 +249,7 @@ public class UserDeviceController {
      * 管理员物理删除设备记录
      */
     @DeleteMapping("/admin/physical/{deviceId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "物理删除设备记录", description = "管理员彻底删除设备记录和相关审计日志，释放存储空间")
     public ApiResponse<Void> adminPhysicalDeleteDevice(@PathVariable Long deviceId) {
         try {
@@ -264,7 +264,7 @@ public class UserDeviceController {
      * 管理员删除用户所有设备记录
      */
     @DeleteMapping("/admin/user/{userId}/all-devices")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "删除用户所有设备", description = "管理员删除指定用户的所有设备记录和审计日志")
     public ApiResponse<Void> adminDeleteAllUserDevices(@PathVariable Long userId) {
         try {

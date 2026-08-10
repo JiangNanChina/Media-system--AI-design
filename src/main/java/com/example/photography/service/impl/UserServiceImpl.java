@@ -8,6 +8,7 @@ import com.example.photography.model.entity.User;
 import com.example.photography.model.enums.UserRole;
 import com.example.photography.repository.*;
 import com.example.photography.service.UserService;
+import com.example.photography.service.RefreshTokenService;
 import com.example.photography.util.FileUploadUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -60,6 +61,9 @@ public class UserServiceImpl implements UserService {
     
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private RefreshTokenService refreshTokenService;
     
     @Autowired
     private FileUploadConfig fileUploadConfig;
@@ -429,22 +433,18 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("原密码不正确");
         }
         
+        validateNewPassword(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword));
+        revokeUserSessions(user);
         userRepository.save(user);
     }
     
     @Override
     public void resetPassword(Long userId, String newPassword) {
         User user = findById(userId);
+        validateNewPassword(newPassword);
         user.setPassword(passwordEncoder.encode(newPassword));
-        userRepository.save(user);
-    }
-    
-    @Override
-    public void resetPasswordToDefault(Long userId) {
-        User user = findById(userId);
-        String defaultPassword = "123456";
-        user.setPassword(passwordEncoder.encode(defaultPassword));
+        revokeUserSessions(user);
         userRepository.save(user);
     }
     
@@ -452,7 +452,19 @@ public class UserServiceImpl implements UserService {
     public void toggleUserStatus(Long userId, boolean enabled) {
         User user = findById(userId);
         user.setEnabled(enabled);
+        if (!enabled) revokeUserSessions(user);
         userRepository.save(user);
+    }
+
+    private void validateNewPassword(String password) {
+        if (password == null || password.length() < 8 || password.length() > 72) {
+            throw new IllegalArgumentException("密码长度必须为8-72位");
+        }
+    }
+
+    private void revokeUserSessions(User user) {
+        user.setTokenVersion((user.getTokenVersion() == null ? 0 : user.getTokenVersion()) + 1);
+        refreshTokenService.revokeAll(user.getId());
     }
     
     @Override

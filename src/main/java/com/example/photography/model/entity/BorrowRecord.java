@@ -1,6 +1,8 @@
 package com.example.photography.model.entity;
 
 import com.example.photography.model.enums.BorrowStatus;
+import com.example.photography.model.enums.BorrowerType;
+import com.example.photography.model.enums.ExternalBorrowerType;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -14,6 +16,26 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "borrow_records")
 public class BorrowRecord extends BaseEntity {
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "borrower_type", nullable = false, length = 20)
+    private BorrowerType borrowerType = BorrowerType.INTERNAL;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "external_borrower_type", length = 20)
+    private ExternalBorrowerType externalBorrowerType;
+
+    @Column(name = "external_organization", length = 150)
+    private String externalOrganization;
+
+    @Column(name = "external_contact_name", length = 80)
+    private String externalContactName;
+
+    @Column(name = "external_phone", length = 20)
+    private String externalPhone;
+
+    @Column(name = "external_email", length = 120)
+    private String externalEmail;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -181,4 +203,17 @@ public class BorrowRecord extends BaseEntity {
     public void setReturnImages(String returnImages) {
         this.returnImages = returnImages;
     }
+
+    public BorrowerType getBorrowerType() { return borrowerType; }
+    public void setBorrowerType(BorrowerType borrowerType) { this.borrowerType = borrowerType; }
+    public ExternalBorrowerType getExternalBorrowerType() { return externalBorrowerType; }
+    public void setExternalBorrowerType(ExternalBorrowerType externalBorrowerType) { this.externalBorrowerType = externalBorrowerType; }
+    public String getExternalOrganization() { return externalOrganization; }
+    public void setExternalOrganization(String externalOrganization) { this.externalOrganization = externalOrganization; }
+    public String getExternalContactName() { return externalContactName; }
+    public void setExternalContactName(String externalContactName) { this.externalContactName = externalContactName; }
+    public String getExternalPhone() { return externalPhone; }
+    public void setExternalPhone(String externalPhone) { this.externalPhone = externalPhone; }
+    public String getExternalEmail() { return externalEmail; }
+    public void setExternalEmail(String externalEmail) { this.externalEmail = externalEmail; }
 }

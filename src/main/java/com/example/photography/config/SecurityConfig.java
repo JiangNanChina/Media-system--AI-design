@@ -1,6 +1,7 @@
 package com.example.photography.config;
 
 import com.example.photography.security.JwtAuthenticationFilter;
+import com.example.photography.security.MaintenanceModeFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -16,6 +17,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.logout.LogoutFilter;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
+import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
+import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -32,9 +38,30 @@ import java.util.stream.Collectors;
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
+
+    @Bean
+    public static RoleHierarchy roleHierarchy() {
+        RoleHierarchyImpl hierarchy = new RoleHierarchyImpl();
+        hierarchy.setHierarchy("""
+                ROLE_SUPER_ADMIN > ROLE_DIRECTOR
+                ROLE_DIRECTOR > ROLE_MINISTER
+                ROLE_MINISTER > ROLE_ADMIN
+                """);
+        return hierarchy;
+    }
+
+    @Bean
+    public static MethodSecurityExpressionHandler methodSecurityExpressionHandler(RoleHierarchy roleHierarchy) {
+        DefaultMethodSecurityExpressionHandler handler = new DefaultMethodSecurityExpressionHandler();
+        handler.setRoleHierarchy(roleHierarchy);
+        return handler;
+    }
     
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @Autowired
+    private MaintenanceModeFilter maintenanceModeFilter;
     
     @Value("${cors.allowed-origins}")
     private String allowedOrigins;
@@ -49,8 +76,8 @@ public class SecurityConfig {
     private boolean allowCredentials;
     
     @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    public static PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(12);
     }
     
     @Bean
@@ -72,6 +99,7 @@ public class SecurityConfig {
                 .requestMatchers("/public/**").permitAll()
                 .requestMatchers("/announcements/public/**").permitAll()  // 公告公开接口
                 .requestMatchers("/site-config/public", "/site-config/public/**").permitAll()  // 站点配置公开接口
+                .requestMatchers("/landing/public", "/maintenance/public/**", "/submissions/public/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/uploads/**").permitAll()  // 静态资源
                 .requestMatchers("/images/**").permitAll()  // 优化的图片服务接口
@@ -84,6 +112,7 @@ public class SecurityConfig {
                 // 其他接口需要认证
                 .anyRequest().authenticated()
             )
+            .addFilterBefore(maintenanceModeFilter, LogoutFilter.class)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
         
         return http.build();

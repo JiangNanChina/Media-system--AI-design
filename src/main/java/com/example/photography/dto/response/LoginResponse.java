@@ -1,6 +1,7 @@
 package com.example.photography.dto.response;
 
 import com.example.photography.model.enums.UserRole;
+import com.example.photography.model.enums.AccountStatus;
 import java.time.LocalDateTime;
 
 /**
@@ -17,6 +18,8 @@ public class LoginResponse {
     private String departmentName;
     private String avatarUrl;
     private LocalDateTime createdAt;
+    private AccountStatus accountStatus;
+    private String loginSessionId;
     
     // Constructors
     public LoginResponse() {}
@@ -106,4 +109,9 @@ public class LoginResponse {
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
+
+    public AccountStatus getAccountStatus() { return accountStatus; }
+    public void setAccountStatus(AccountStatus accountStatus) { this.accountStatus = accountStatus; }
+    public String getLoginSessionId() { return loginSessionId; }
+    public void setLoginSessionId(String loginSessionId) { this.loginSessionId = loginSessionId; }
 }

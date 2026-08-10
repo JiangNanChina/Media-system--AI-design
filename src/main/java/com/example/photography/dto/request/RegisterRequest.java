@@ -18,7 +18,7 @@ public class RegisterRequest {
     private String username;
     
     @NotBlank(message = "密码不能为空")
-    @Size(min = 6, max = 50, message = "密码长度必须在6-50个字符之间")
+    @Size(min = 8, max = 72, message = "密码长度必须在8-72个字符之间")
     private String password;
     
     @NotBlank(message = "确认密码不能为空")
@@ -35,7 +35,6 @@ public class RegisterRequest {
     @NotBlank(message = "邮箱验证码不能为空")
     private String emailCode;
     
-    @NotNull(message = "用户角色不能为空")
     private UserRole role;
     
     private Long departmentId;

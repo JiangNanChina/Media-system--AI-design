@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 import java.time.LocalDateTime;
+import com.example.photography.model.enums.BorrowerType;
+import com.example.photography.model.enums.ExternalBorrowerType;
 
 /**
  * 借用申请请求DTO
@@ -21,6 +23,13 @@ public class BorrowRequest {
     private LocalDateTime expectedReturnTime;
     
     private String borrowReason;
+
+    private BorrowerType borrowerType = BorrowerType.INTERNAL;
+    private ExternalBorrowerType externalBorrowerType;
+    private String externalOrganization;
+    private String externalContactName;
+    private String externalPhone;
+    private String externalEmail;
     
     // Constructors
     public BorrowRequest() {}
@@ -64,4 +73,17 @@ public class BorrowRequest {
     public void setBorrowReason(String borrowReason) {
         this.borrowReason = borrowReason;
     }
+
+    public BorrowerType getBorrowerType() { return borrowerType; }
+    public void setBorrowerType(BorrowerType borrowerType) { this.borrowerType = borrowerType; }
+    public ExternalBorrowerType getExternalBorrowerType() { return externalBorrowerType; }
+    public void setExternalBorrowerType(ExternalBorrowerType externalBorrowerType) { this.externalBorrowerType = externalBorrowerType; }
+    public String getExternalOrganization() { return externalOrganization; }
+    public void setExternalOrganization(String externalOrganization) { this.externalOrganization = externalOrganization; }
+    public String getExternalContactName() { return externalContactName; }
+    public void setExternalContactName(String externalContactName) { this.externalContactName = externalContactName; }
+    public String getExternalPhone() { return externalPhone; }
+    public void setExternalPhone(String externalPhone) { this.externalPhone = externalPhone; }
+    public String getExternalEmail() { return externalEmail; }
+    public void setExternalEmail(String externalEmail) { this.externalEmail = externalEmail; }
 }

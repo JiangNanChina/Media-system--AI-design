@@ -7,6 +7,7 @@ import com.example.photography.model.entity.DutyRecord;
 import com.example.photography.model.entity.DutySchedule;
 import com.example.photography.model.entity.LeaveRequest;
 import com.example.photography.model.entity.User;
+import com.example.photography.model.enums.UserRole;
 import com.example.photography.repository.CheckinConfigurationRepository;
 import com.example.photography.repository.CheckinRecordRepository;
 import com.example.photography.repository.DutyRecordRepository;
@@ -67,6 +68,7 @@ class LeaveServiceImplTest {
         LocalDate leaveDate = LocalDate.of(2026, 5, 7);
         User user = user(1L, "member");
         User approver = user(2L, "admin");
+        approver.setRole(UserRole.SUPER_ADMIN);
         CheckinConfiguration selectedConfig = checkinConfig(10L, "晚自习一", LocalTime.of(19, 0));
 
         LeaveRequest leaveRequest = leaveRequest(user, LeaveRequest.LeaveType.CHECKIN_LEAVE, leaveDate);
@@ -96,6 +98,7 @@ class LeaveServiceImplTest {
         LocalDate leaveDate = LocalDate.of(2026, 5, 9);
         User user = user(1L, "member");
         User approver = user(2L, "admin");
+        approver.setRole(UserRole.SUPER_ADMIN);
         DutySchedule selectedSchedule = dutySchedule(20L, user, leaveDate.getDayOfWeek().getValue());
 
         LeaveRequest leaveRequest = leaveRequest(user, LeaveRequest.LeaveType.DUTY_LEAVE, leaveDate);
@@ -126,6 +129,7 @@ class LeaveServiceImplTest {
         LocalDate leaveDate = LocalDate.of(2026, 5, 9);
         User user = user(1L, "member");
         User approver = user(2L, "admin");
+        approver.setRole(UserRole.SUPER_ADMIN);
         LeaveRequest leaveRequest = leaveRequest(user, LeaveRequest.LeaveType.OTHER, leaveDate);
 
         LeaveApprovalRequest rejection = new LeaveApprovalRequest();
@@ -180,6 +184,7 @@ class LeaveServiceImplTest {
         user.setUsername(username);
         user.setPassword("password");
         user.setRealName(username);
+        user.setRole(UserRole.MEMBER);
         return user;
     }
 

@@ -27,6 +27,19 @@ export default defineConfig({
       }
     }
   },
+  test: {
+    environment: 'jsdom',
+    include: ['src/**/*.test.js'],
+    setupFiles: ['./src/test/setup.js'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      include: ['src/router/index.js', 'src/stores/user.js'],
+      thresholds: {
+        lines: 80
+      }
+    }
+  },
   build: {
     outDir: 'dist',
     assetsDir: 'assets',

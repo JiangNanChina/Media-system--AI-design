@@ -29,7 +29,7 @@
                 <span>成员注册</span>
               </div>
             </el-radio>
-            <el-radio value="ADMIN">
+            <el-radio v-if="false" value="ADMIN">
               <div class="role-option">
                 <el-icon><Setting /></el-icon>
                 <span>管理员注册</span>
@@ -40,7 +40,7 @@
         
         <!-- 管理员密钥（仅管理员注册时显示） -->
         <transition name="admin-key-slide" appear>
-          <div v-if="registerForm.role === 'ADMIN'" class="admin-key-section">
+          <div v-if="false" class="admin-key-section">
             <el-form-item prop="adminSecretKey">
               <template #label>
                 <span class="form-label">管理员密钥</span>
@@ -591,28 +591,8 @@ const handleRoleChange = () => {
 
 // 验证管理员密钥
 const validateAdminKey = async () => {
-  if (registerForm.role !== 'ADMIN' || !registerForm.adminSecretKey) {
-    return
-  }
-  
-  try {
-    const response = await request.post('/auth/validate-admin-key', registerForm.adminSecretKey, {
-      headers: {
-        'Content-Type': 'text/plain'
-      }
-    })
-    
-    if (response.data === true) {
-      adminKeyValidated.value = true
-      adminKeyError.value = ''
-    } else {
-      adminKeyValidated.value = false
-      adminKeyError.value = '管理员密钥错误'
-    }
-  } catch (error) {
-    adminKeyValidated.value = false
-    adminKeyError.value = '密钥验证失败'
-  }
+  adminKeyValidated.value = false
+  adminKeyError.value = '系统不支持管理员自助注册'
 }
 
 // 处理用户名输入：禁止中文，只允许字母、数字和下划线

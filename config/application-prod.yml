@@ -5,7 +5,7 @@ spring:
   # 生产环境数据库配置
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/photography_system?useUnicode=true&characterEncoding=utf8&useSSL=true&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true}
-    username: ${DB_USERNAME:photography_system}
+    username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     
@@ -39,8 +39,8 @@ spring:
   # 文件上传配置
   servlet:
     multipart:
-      max-file-size: 20MB
-      max-request-size: 100MB
+      max-file-size: 500MB
+      max-request-size: 510MB
       
   # 静态资源配置
   web:
@@ -52,12 +52,19 @@ spring:
 # JWT配置 
 jwt:
   secret: ${JWT_SECRET}
-  expiration: 86400000 # 24小时
+  expiration: 900000
+  refresh-expiration: 604800000
 
 # 应用配置
 app:
   admin:
     secret-key: ${ADMIN_SECRET_KEY}
+  security:
+    config-encryption-key: ${CONFIG_ENCRYPTION_KEY}
+    migrate-legacy-users: true
+
+maintenance:
+  token-secret: ${MAINTENANCE_TOKEN_SECRET}
 
 # 文件上传路径（生产环境使用绝对路径）
 file:
@@ -67,6 +74,8 @@ file:
     equipment-path: equipment/
     return-path: returns/
     site-path: site/
+  private-upload:
+    path: ${PRIVATE_UPLOAD_PATH:/www/photography/private-uploads/}
 
 # 服务器配置
 server:

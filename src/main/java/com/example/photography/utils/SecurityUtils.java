@@ -74,6 +74,6 @@ public class SecurityUtils {
      */
     public static boolean isCurrentUserAdmin() {
         User user = getCurrentUser();
-        return user != null && UserRole.ADMIN.equals(user.getRole());
+        return user != null && user.getRole().isSuperAdmin();
     }
 }

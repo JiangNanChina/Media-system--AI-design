@@ -71,7 +71,7 @@ public class SiteConfigController {
      * 获取所有配置
      */
     @GetMapping("/admin/list")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "获取所有配置", description = "管理员获取所有站点配置列表")
     public ApiResponse<List<SiteConfigResponse>> getAllConfigs() {
         try {
@@ -89,7 +89,7 @@ public class SiteConfigController {
      * 根据配置键获取配置
      */
     @GetMapping("/admin/{configKey}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "获取单个配置", description = "根据配置键获取配置详情")
     public ApiResponse<SiteConfigResponse> getConfigByKey(@PathVariable String configKey) {
         try {
@@ -107,7 +107,7 @@ public class SiteConfigController {
      * 创建或更新配置
      */
     @PostMapping("/admin/save")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "保存配置", description = "创建或更新站点配置")
     public ApiResponse<SiteConfigResponse> saveConfig(@Valid @RequestBody SiteConfigRequest request) {
         try {
@@ -122,7 +122,7 @@ public class SiteConfigController {
      * 更新配置
      */
     @PutMapping("/admin/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "更新配置", description = "根据ID更新配置")
     public ApiResponse<SiteConfigResponse> updateConfig(
             @PathVariable Long id,
@@ -139,7 +139,7 @@ public class SiteConfigController {
      * 删除配置
      */
     @DeleteMapping("/admin/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "删除配置", description = "删除指定配置")
     public ApiResponse<Void> deleteConfig(@PathVariable Long id) {
         try {
@@ -154,7 +154,7 @@ public class SiteConfigController {
      * 上传网站LOGO
      */
     @PostMapping("/admin/upload-logo")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "上传网站LOGO", description = "上传并设置网站LOGO")
     public ApiResponse<String> uploadLogo(@RequestParam("file") MultipartFile file) {
         try {
@@ -173,7 +173,7 @@ public class SiteConfigController {
      * 上传登录背景
      */
     @PostMapping("/admin/upload-background")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "上传登录背景", description = "上传并设置登录页面背景图")
     public ApiResponse<String> uploadLoginBackground(@RequestParam("file") MultipartFile file) {
         try {
@@ -192,7 +192,7 @@ public class SiteConfigController {
      * 批量更新配置
      */
     @PostMapping("/admin/batch")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "批量更新配置", description = "批量更新多个配置项")
     public ApiResponse<List<SiteConfigResponse>> batchUpdateConfigs(
             @Valid @RequestBody List<SiteConfigRequest> requests) {
@@ -212,7 +212,7 @@ public class SiteConfigController {
     }
 
     @PostMapping("/admin/mail/test")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "测试QQ邮箱配置", description = "发送测试邮件验证QQ邮箱SMTP配置是否可用")
     public ApiResponse<Void> testMail(@Valid @RequestBody MailTestRequest request) {
         try {
@@ -224,7 +224,7 @@ public class SiteConfigController {
     }
 
     @GetMapping("/admin/mail/logs")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "获取邮件发送日志", description = "分页查看QQ邮箱验证码与提醒邮件发送记录")
     public ApiResponse<Page<EmailNotificationLogResponse>> getMailLogs(
             @RequestParam(defaultValue = "0") int page,
@@ -250,7 +250,7 @@ public class SiteConfigController {
      * 初始化默认配置
      */
     @PostMapping("/admin/init-defaults")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "初始化默认配置", description = "初始化系统默认配置")
     public ApiResponse<Void> initDefaultConfigs() {
         try {
@@ -265,7 +265,7 @@ public class SiteConfigController {
      * 重置为默认配置
      */
     @PostMapping("/admin/reset-defaults")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "重置为默认配置", description = "重置所有配置为系统默认值")
     public ApiResponse<Void> resetToDefaults() {
         try {
@@ -280,7 +280,7 @@ public class SiteConfigController {
      * 修复路径重复问题
      */
     @PostMapping("/admin/fix-paths")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "修复路径重复问题", description = "修复LOGO和背景路径中的重复uploads前缀")
     public ApiResponse<String> fixDuplicatePaths() {
         try {
@@ -296,7 +296,7 @@ public class SiteConfigController {
      * 🔧 调试API：检查站点图片文件状态
      */
     @GetMapping("/admin/debug-images")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @Operation(summary = "调试图片文件状态", description = "检查站点LOGO和背景图片的文件状态和路径信息")
     public ApiResponse<Map<String, Object>> debugImages() {
         try {

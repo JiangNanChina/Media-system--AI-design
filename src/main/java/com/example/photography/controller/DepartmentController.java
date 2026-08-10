@@ -89,7 +89,7 @@ public class DepartmentController {
     }
     
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "创建部门", description = "创建新的部门（仅管理员）")
     public ApiResponse<DepartmentResponse> createDepartment(@Valid @RequestBody DepartmentCreateRequest request) {
         try {
@@ -101,7 +101,7 @@ public class DepartmentController {
     }
     
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "更新部门", description = "更新部门信息（仅管理员）")
     public ApiResponse<Department> updateDepartment(@PathVariable Long id, 
                                                    @Valid @RequestBody DepartmentCreateRequest request) {
@@ -114,7 +114,7 @@ public class DepartmentController {
     }
     
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "删除部门", description = "删除指定部门（仅管理员）")
     public ApiResponse<Void> deleteDepartment(@PathVariable Long id) {
         try {
@@ -126,7 +126,7 @@ public class DepartmentController {
     }
     
     @GetMapping("/statistics")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "获取部门统计信息", description = "获取部门统计数据（仅管理员）")
     public ApiResponse<DepartmentService.DepartmentStatistics> getDepartmentStatistics() {
         try {
@@ -138,7 +138,7 @@ public class DepartmentController {
     }
     
     @PostMapping("/init")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "初始化默认部门", description = "初始化系统默认部门（仅管理员）")
     public ApiResponse<Void> initializeDefaultDepartments() {
         try {

@@ -301,16 +301,15 @@ public class EmailNotificationServiceImpl implements EmailNotificationService {
         Long departmentId = applicant != null && applicant.getDepartment() != null ? applicant.getDepartment().getId() : null;
 
         List<User> candidates = new ArrayList<>();
-        if (departmentId != null) {
-            candidates.addAll(userRepository.findByDepartmentIdAndRoleAndDeletedFalse(departmentId, UserRole.ADMIN));
+        if (applicant != null && applicant.getRole() == UserRole.MEMBER && departmentId != null) {
+            candidates.addAll(userRepository.findByDepartmentIdAndRoleAndDeletedFalse(departmentId, UserRole.MINISTER));
         }
-
-        List<User> sameDepartmentApprovers = filterApprovers(candidates, applicantId);
-        if (!sameDepartmentApprovers.isEmpty()) {
-            return sameDepartmentApprovers;
+        if (applicant == null || applicant.getRole() == UserRole.MEMBER || applicant.getRole() == UserRole.MINISTER) {
+            candidates.addAll(userRepository.findByRoleAndDeletedFalse(UserRole.DIRECTOR));
         }
-
-        return filterApprovers(userRepository.findByRoleAndDeletedFalse(UserRole.ADMIN), applicantId);
+        candidates.addAll(userRepository.findByRoleAndDeletedFalse(UserRole.SUPER_ADMIN));
+        candidates.addAll(userRepository.findByRoleAndDeletedFalse(UserRole.ADMIN));
+        return filterApprovers(candidates, applicantId);
     }
 
     private List<User> filterApprovers(List<User> users, Long applicantId) {

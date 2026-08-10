@@ -124,7 +124,7 @@ public class LeaveController {
      * 审批请假申请
      */
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('MINISTER','DIRECTOR','SUPER_ADMIN','ADMIN')")
     @Operation(summary = "审批请假申请", description = "管理员审批请假申请")
     public ApiResponse<LeaveRequest> approveLeaveRequest(@PathVariable Long id, 
                                                        @Valid @RequestBody LeaveApprovalRequest request) {
@@ -273,11 +273,19 @@ public class LeaveController {
      * 获取待审批的请假申请
      */
     @GetMapping("/pending")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('MINISTER','DIRECTOR','SUPER_ADMIN','ADMIN')")
     @Operation(summary = "获取待审批请假申请", description = "管理员获取待审批的请假申请")
     public ApiResponse<List<LeaveRequest>> getPendingLeaveRequests() {
         try {
-            List<LeaveRequest> requests = leaveService.getPendingLeaveRequests();
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            User reviewer = userRepository.findById((Long) authentication.getDetails())
+                    .orElseThrow(() -> new RuntimeException("审核人不存在"));
+            List<LeaveRequest> requests = leaveService.getPendingLeaveRequests().stream()
+                    .filter(item -> reviewer.getRole().isSuperAdmin() || reviewer.getRole() == com.example.photography.model.enums.UserRole.DIRECTOR
+                            || (reviewer.getRole() == com.example.photography.model.enums.UserRole.MINISTER
+                            && reviewer.getDepartment() != null && item.getUser().getDepartment() != null
+                            && reviewer.getDepartment().getId().equals(item.getUser().getDepartment().getId())))
+                    .toList();
             return ApiResponse.success(requests);
         } catch (Exception e) {
             return ApiResponse.error(e.getMessage());

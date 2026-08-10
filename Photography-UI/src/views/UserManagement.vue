@@ -23,8 +23,7 @@
         
         <el-col :xs="24" :sm="6" :md="4" :lg="4">
           <el-select v-model="searchForm.role" placeholder="选择角色" clearable>
-            <el-option label="管理员" value="ADMIN" />
-            <el-option label="成员" value="MEMBER" />
+            <el-option v-for="option in roleOptions" :key="option.value" :label="option.label" :value="option.value" />
           </el-select>
         </el-col>
         
@@ -56,7 +55,7 @@
               <el-icon><Refresh /></el-icon>
               重置
             </el-button>
-            <el-button type="success" @click="handleCreate">
+            <el-button v-if="!userStore.isMinister" type="success" @click="handleCreate">
               <el-icon><Plus /></el-icon>
               新增用户
             </el-button>
@@ -73,7 +72,7 @@
             <el-icon><UserFilled /></el-icon>
             用户列表 (共 {{ pagination.total }} 条)
           </span>
-          <div class="table-actions">
+          <div v-if="!userStore.isMinister" class="table-actions">
             <el-button 
               type="warning" 
               size="small"
@@ -122,8 +121,8 @@
         
         <el-table-column label="角色" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.role === 'ADMIN' ? 'danger' : 'primary'" size="small">
-              {{ row.role === 'ADMIN' ? '管理员' : '成员' }}
+            <el-tag :type="roleTagType(row.role)" size="small">
+              {{ roleLabel(row.role) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -167,14 +166,14 @@
                     <el-dropdown-item command="edit">
                       <el-icon><Edit /></el-icon> 编辑
                     </el-dropdown-item>
-                    <el-dropdown-item command="resetPassword">
+                    <el-dropdown-item v-if="!userStore.isMinister" command="resetPassword">
                       <el-icon><Key /></el-icon> 重置密码
                     </el-dropdown-item>
                     <el-dropdown-item :command="row.enabled ? 'disable' : 'enable'">
                       <el-icon><component :is="row.enabled ? 'Lock' : 'Unlock'" /></el-icon>
                       {{ row.enabled ? '禁用' : '启用' }}
                     </el-dropdown-item>
-                    <el-dropdown-item command="delete" :disabled="row.id === userStore.userInfo?.id">
+                    <el-dropdown-item v-if="!userStore.isMinister" command="delete" :disabled="row.id === userStore.userInfo?.id">
                       <el-icon><Delete /></el-icon> 删除
                     </el-dropdown-item>
                   </el-dropdown-menu>
@@ -186,7 +185,7 @@
                 <el-icon><Edit /></el-icon>
                 编辑
               </el-button>
-              <el-button 
+              <el-button v-if="!userStore.isMinister"
                 class="action-btn action-reset"
                 size="small" 
                 @click="handleResetPassword(row)"
@@ -203,7 +202,7 @@
                 <el-icon><component :is="row.enabled ? 'Lock' : 'Unlock'" /></el-icon>
                 {{ row.enabled ? '禁用' : '启用' }}
               </el-button>
-              <el-button 
+              <el-button v-if="!userStore.isMinister"
                 size="small" 
                 class="action-btn action-delete"
                 @click="handleDelete(row)"
@@ -287,10 +286,9 @@
                 v-model="userForm.role" 
                 placeholder="选择角色" 
                 style="width: 100%"
-                clearable
+                :disabled="!userStore.isSuperAdmin"
               >
-                <el-option label="管理员" value="ADMIN" />
-                <el-option label="成员" value="MEMBER" />
+                <el-option v-for="option in roleOptions" :key="option.value" :label="option.label" :value="option.value" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -372,6 +370,15 @@ import { useUserStore } from '@/stores/user'
 import request from '@/utils/request'
 
 const userStore = useUserStore()
+const roleOptions = [
+  { label: '部员', value: 'MEMBER' },
+  { label: '部长', value: 'MINISTER' },
+  { label: '主任', value: 'DIRECTOR' },
+  { label: '指导老师', value: 'ADVISOR' },
+  { label: '系统超级管理员', value: 'SUPER_ADMIN' }
+]
+const roleLabel = role => roleOptions.find(option => option.value === role)?.label || (role === 'ADMIN' ? '系统超级管理员' : role)
+const roleTagType = role => ({ SUPER_ADMIN: 'danger', ADMIN: 'danger', DIRECTOR: 'warning', MINISTER: 'success', ADVISOR: 'info' }[role] || 'primary')
 
 // 移动端检测
 const screenWidth = ref(window.innerWidth)
@@ -458,7 +465,7 @@ const userRules = {
   ],
   password: [
     { required: true, message: '请输入初始密码', trigger: 'blur' },
-    { min: 6, max: 50, message: '密码长度在 6 到 50 个字符', trigger: 'blur' }
+    { min: 8, max: 72, message: '密码长度在 8 到 72 个字符', trigger: 'blur' }
   ]
 }
 
@@ -482,6 +489,21 @@ const fetchUsers = async () => {
     })
     
     console.log('发送用户查询请求，参数:', params)
+    if (userStore.isMinister) {
+      const response = await request.get('/department-members')
+      let rows = response.data || []
+      if (searchForm.keyword) {
+        const keyword = searchForm.keyword.toLowerCase()
+        rows = rows.filter(user => `${user.username || ''}${user.realName || ''}`.toLowerCase().includes(keyword))
+      }
+      if (searchForm.role) rows = rows.filter(user => user.role === searchForm.role)
+      if (searchForm.enabled !== '') rows = rows.filter(user => user.enabled === searchForm.enabled)
+      pagination.total = rows.length
+      const offset = (pagination.page - 1) * pagination.size
+      userList.value = rows.slice(offset, offset + pagination.size)
+      return
+    }
+
     const response = await request.get('/users', { params })
     
     if (response.data) {
@@ -640,9 +662,21 @@ const handleSaveUser = async () => {
     const userData = { ...userForm }
     
     if (editingUser.value) {
-      // 编辑用户
-      delete userData.password // 编辑时不传密码
-      await request.put(`/users/${editingUser.value.id}`, userData)
+      delete userData.password
+      const selectedRole = userData.role
+      delete userData.role
+      if (userStore.isMinister) {
+        await request.put(`/department-members/${editingUser.value.id}`, {
+          realName: userData.realName,
+          email: userData.email,
+          enabled: userData.enabled
+        })
+      } else {
+        await request.put(`/users/${editingUser.value.id}`, userData)
+        if (userStore.isSuperAdmin && selectedRole !== editingUser.value.role) {
+          await request.put(`/accounts/admin/${editingUser.value.id}/role`, { role: selectedRole })
+        }
+      }
       ElMessage.success('用户更新成功')
     } else {
       // 新增用户
@@ -683,19 +717,21 @@ const handleUserFormUsernameInput = (value) => {
 // 重置密码
 const handleResetPassword = async (user) => {
   try {
-    await ElMessageBox.confirm(
-      `确定要将用户 "${user.realName || user.username}" 的密码重置为默认密码 123456 吗？`, 
-      '重置密码确认', 
+    const { value: newPassword } = await ElMessageBox.prompt(
+      `为用户“${user.realName || user.username}”设置一次性新密码`,
+      '重置密码',
       {
         type: 'warning',
-        confirmButtonText: '确定重置',
-        cancelButtonText: '取消'
+        confirmButtonText: '确认重置',
+        cancelButtonText: '取消',
+        inputType: 'password',
+        inputPattern: /^.{8,72}$/,
+        inputErrorMessage: '密码长度必须为8-72位'
       }
     )
-    
-    await request.post(`/users/${user.id}/reset-password-default`)
-    
-    ElMessage.success('密码已重置为 123456')
+
+    await request.post(`/users/${user.id}/reset-password`, { newPassword })
+    ElMessage.success('密码已重置，用户需要重新登录')
     fetchUsers()
   } catch (error) {
     if (error !== 'cancel') {
@@ -713,10 +749,11 @@ const handleToggleStatus = async (user) => {
       type: 'warning'
     })
     
-    await request.put(`/users/${user.id}`, {
-      ...user,
-      enabled: !user.enabled
-    })
+    if (userStore.isMinister) {
+      await request.put(`/department-members/${user.id}`, { enabled: !user.enabled })
+    } else {
+      await request.put(`/users/${user.id}`, { enabled: !user.enabled })
+    }
     
     ElMessage.success(`用户${action}成功`)
     fetchUsers()

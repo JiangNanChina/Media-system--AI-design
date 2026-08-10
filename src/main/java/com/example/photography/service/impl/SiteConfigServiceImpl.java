@@ -4,6 +4,7 @@ import com.example.photography.dto.request.SiteConfigRequest;
 import com.example.photography.model.entity.SiteConfig;
 import com.example.photography.repository.SiteConfigRepository;
 import com.example.photography.service.SiteConfigService;
+import com.example.photography.service.SensitiveConfigCrypto;
 import com.example.photography.util.FileUploadUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +34,9 @@ public class SiteConfigServiceImpl implements SiteConfigService {
     
     @Autowired
     private FileUploadUtil fileUploadUtil;
+
+    @Autowired
+    private SensitiveConfigCrypto sensitiveConfigCrypto;
     
     @Value("${app.upload.site-assets-dir:site}")
     private String siteAssetsDir;
@@ -65,7 +69,12 @@ public class SiteConfigServiceImpl implements SiteConfigService {
     @Transactional(readOnly = true)
     public String getConfigValue(String configKey, String defaultValue) {
         SiteConfig config = getConfigByKey(configKey);
-        return config != null && config.getEnabled() ? config.getConfigValue() : defaultValue;
+        if (config == null || !config.getEnabled()) return defaultValue;
+        if (SiteConfig.Keys.MAIL_QQ_AUTH_CODE.equals(configKey)) {
+            String decrypted = sensitiveConfigCrypto.decrypt(config.getConfigValue());
+            return StringUtils.hasText(decrypted) ? decrypted : defaultValue;
+        }
+        return config.getConfigValue();
     }
     
     @Override
@@ -381,7 +390,7 @@ public class SiteConfigServiceImpl implements SiteConfigService {
         if (!StringUtils.hasText(incomingValue) || SENSITIVE_MASK.equals(incomingValue.trim())) {
             return existingConfig != null ? existingConfig.getConfigValue() : "";
         }
-        return incomingValue;
+        return sensitiveConfigCrypto.encrypt(incomingValue.trim());
     }
     
     @Override

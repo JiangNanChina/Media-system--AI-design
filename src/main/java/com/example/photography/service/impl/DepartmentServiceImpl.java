@@ -153,6 +153,7 @@ public class DepartmentServiceImpl implements DepartmentService {
         initDepartmentIfNotExists("摄影部", "负责活动摄影、图片拍摄等工作");
         initDepartmentIfNotExists("采编部", "负责新闻采集、内容编辑等工作");
         initDepartmentIfNotExists("审核部", "负责内容审核、质量把控等工作");
+        initDepartmentIfNotExists("运营部", "负责平台运营、账号维护与内容分发等工作");
         initDepartmentIfNotExists("宣传部", "负责对外宣传、推广等工作");
     }
     

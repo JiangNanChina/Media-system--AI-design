@@ -200,7 +200,7 @@ public class BorrowController {
     }
     
     @PutMapping("/{id}/approve")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('MINISTER','DIRECTOR','SUPER_ADMIN','ADMIN')")
     @Operation(summary = "审批借用申请", description = "管理员审批借用申请（仅管理员）")
     public ApiResponse<Void> approveBorrowRequest(@PathVariable Long id, 
                                                          @Valid @RequestBody BorrowApprovalRequest request) {

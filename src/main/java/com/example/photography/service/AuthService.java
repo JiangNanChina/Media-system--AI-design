@@ -24,6 +24,8 @@ public interface AuthService {
      * 刷新令牌
      */
     LoginResponse refreshToken(String token);
+
+    LoginResponse issueAccessToken(Long userId);
     
     /**
      * 验证令牌
@@ -43,5 +45,4 @@ public interface AuthService {
     /**
      * 验证管理员密钥
      */
-    boolean validateAdminSecretKey(String secretKey);
 }

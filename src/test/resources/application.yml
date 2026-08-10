@@ -32,6 +32,8 @@ file:
     avatar-path: avatars/
     equipment-path: equipment/
     return-path: returns/
+  private-upload:
+    path: target/test-private-uploads/
 
 # CORS（测试环境给出安全的默认值）
 cors:
@@ -43,11 +45,19 @@ cors:
 # JWT（测试环境沿用默认并保证可用）
 jwt:
   secret: test-only-jwt-secret-that-is-not-used-outside-local-tests
-  expiration: 86400000
+  expiration: 900000
+  refresh-expiration: 604800000
 
 app:
   admin:
     secret-key: test-admin-secret
   upload:
     site-assets-dir: site
+  security:
+    config-encryption-key: test-only-config-encryption-key
+    migrate-legacy-users: false
+    cookie-secure: false
+
+maintenance:
+  token-secret: test-only-maintenance-token-secret-with-sufficient-length
 

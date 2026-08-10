@@ -1,0 +1,19 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/photography_system?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
+
+jwt:
+  secret: ${JWT_SECRET:local-development-jwt-secret-change-before-sharing-64-characters-minimum-2026}
+
+app:
+  security:
+    config-encryption-key: ${CONFIG_ENCRYPTION_KEY:local-development-config-key-32-bytes}
+    cookie-secure: false
+
+maintenance:
+  token-secret: ${MAINTENANCE_TOKEN_SECRET:local-development-maintenance-token-secret-2026}

@@ -4,6 +4,7 @@ import com.example.photography.dto.request.LeaveApprovalRequest;
 import com.example.photography.dto.request.LeaveRequestRequest;
 import com.example.photography.model.entity.LeaveRequest;
 import com.example.photography.model.entity.User;
+import com.example.photography.model.enums.UserRole;
 import com.example.photography.model.entity.DutyRecord;
 import com.example.photography.model.entity.DutySchedule;
 import com.example.photography.model.entity.CheckinConfiguration;
@@ -120,6 +121,9 @@ public class LeaveServiceImpl implements LeaveService {
         // 获取审批人（预加载部门信息）
         User approver = userRepository.findByIdWithDepartment(approverId)
                 .orElseThrow(() -> new RuntimeException("审批人不存在"));
+        if (!canApprove(approver, leaveRequest.getUser())) {
+            throw new org.springframework.security.access.AccessDeniedException("无权审批该请假申请");
+        }
         
         // 更新审批信息
         leaveRequest.setStatus(request.getStatus());
@@ -383,6 +387,17 @@ public class LeaveServiceImpl implements LeaveService {
         
         List<LeaveRequest> requests = leaveRequestRepository.findApprovedLeaveForUserAndDate(user, date);
         return !requests.isEmpty();
+    }
+
+    private boolean canApprove(User approver, User applicant) {
+        UserRole role = approver.getRole();
+        if (role.isSuperAdmin()) return !approver.getId().equals(applicant.getId());
+        if (applicant.getRole() == UserRole.MEMBER) {
+            if (role == UserRole.DIRECTOR) return true;
+            return role == UserRole.MINISTER && approver.getDepartment() != null && applicant.getDepartment() != null
+                    && approver.getDepartment().getId().equals(applicant.getDepartment().getId());
+        }
+        return applicant.getRole() == UserRole.MINISTER && role == UserRole.DIRECTOR;
     }
 
     @Override

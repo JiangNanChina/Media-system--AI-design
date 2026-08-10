@@ -118,7 +118,8 @@ public class ExcelExportServiceImpl implements ExcelExportService {
         }
         
         List<String> headers = Arrays.asList(
-                "序号", "借用人", "所属部门", "设备名称", "设备序列号", "数量", 
+                "序号", "借用类型", "代办成员", "所属部门", "外部对象类型", "外部单位", "联系人", "手机号", "QQ邮箱",
+                "设备名称", "设备序列号", "数量",
                 "借用时间", "预期归还时间", "实际归还时间", "状态", "借用原因", "归还备注"
         );
         
@@ -127,9 +128,15 @@ public class ExcelExportServiceImpl implements ExcelExportService {
         for (BorrowRecord record : records) {
             List<Object> row = new ArrayList<>();
             row.add(index++);
+            row.add(record.getBorrowerType() == com.example.photography.model.enums.BorrowerType.EXTERNAL ? "外部借用" : "内部借用");
             row.add(record.getUser() != null ? record.getUser().getRealName() : "");
             row.add(record.getUser() != null && record.getUser().getDepartment() != null ? 
                     record.getUser().getDepartment().getName() : "");
+            row.add(externalBorrowerTypeName(record.getExternalBorrowerType()));
+            row.add(Objects.toString(record.getExternalOrganization(), ""));
+            row.add(Objects.toString(record.getExternalContactName(), ""));
+            row.add(Objects.toString(record.getExternalPhone(), ""));
+            row.add(Objects.toString(record.getExternalEmail(), ""));
             row.add(record.getEquipment() != null ? record.getEquipment().getName() : "");
             row.add(record.getEquipment() != null ? record.getEquipment().getSerialNumber() : "");
             row.add(record.getQuantity() != null ? record.getQuantity() : 0);
@@ -146,6 +153,15 @@ public class ExcelExportServiceImpl implements ExcelExportService {
         }
         
         return exportToExcel("借还记录", headers, data);
+    }
+
+    private String externalBorrowerTypeName(com.example.photography.model.enums.ExternalBorrowerType type) {
+        if (type == null) return "";
+        return switch (type) {
+            case COLLEGE -> "学院";
+            case DEPARTMENT -> "部门";
+            case TEACHER -> "老师";
+        };
     }
     
     @Override

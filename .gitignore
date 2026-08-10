@@ -40,6 +40,9 @@ www/
 Photography-UI/.env
 Photography-UI/.env.*
 !Photography-UI/env.example
+Photography-UI/coverage/
+Photography-UI/playwright-report/
+Photography-UI/test-results/
 
 ### Logs and OS files ###
 *.log

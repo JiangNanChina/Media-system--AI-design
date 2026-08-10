@@ -148,8 +148,6 @@ public interface UserService {
     /**
      * 重置密码为默认密码（123456）
      */
-    void resetPasswordToDefault(Long userId);
-    
     /**
      * 启用/禁用用户
      */

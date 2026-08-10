@@ -1,12 +1,11 @@
 spring:
   application:
     name: Photography
+  profiles:
+    default: dev
   
   # 数据库配置
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/photography_system?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
     
   # JPA配置
@@ -23,8 +22,8 @@ spring:
   # 文件上传配置
   servlet:
     multipart:
-      max-file-size: 20MB
-      max-request-size: 100MB
+      max-file-size: 500MB
+      max-request-size: 510MB
       
   # 静态资源配置
   web:
@@ -42,13 +41,14 @@ spring:
 
 # JWT配置
 jwt:
-  secret: ${JWT_SECRET:change-me-to-a-strong-512-bit-secret-before-deploy}
-  expiration: 86400000 # 24小时
+  expiration: 900000 # 15分钟
+  refresh-expiration: 604800000 # 7天
 
 # 应用配置
 app:
-  admin:
-    secret-key: ${ADMIN_SECRET_KEY:change-me-before-deploy}  # 管理员注册密钥
+  security:
+    migrate-legacy-users: true
+    cookie-secure: true
   
 # 文件上传路径（开发环境使用相对路径）
 file:
@@ -57,6 +57,8 @@ file:
     avatar-path: avatars/
     equipment-path: equipment/
     return-path: returns/
+  private-upload:
+    path: ${PRIVATE_UPLOAD_PATH:private-uploads/}
 
 # 服务器配置
 server:
@@ -67,6 +69,7 @@ server:
     enabled: true
     mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json,image/svg+xml
     min-response-size: 1024
+  forward-headers-strategy: framework
 
 # 日志配置
 logging:

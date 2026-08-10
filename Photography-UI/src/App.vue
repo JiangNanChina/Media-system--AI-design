@@ -13,13 +13,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { setupRouterGuards } from '@/router'
 import InteractiveCursor from '@/components/InteractiveCursor.vue'
-
-const router = useRouter()
-const route = useRoute()
 
 // 存储上一个路由路径
 let previousPath = ''
@@ -69,11 +63,6 @@ const getTransitionName = (currentRoute) => {
   return transitionName
 }
 
-
-onMounted(() => {
-  // 设置路由守卫
-  setupRouterGuards(router)
-})
 </script>
 
 <style>

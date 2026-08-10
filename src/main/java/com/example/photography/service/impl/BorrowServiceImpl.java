@@ -9,6 +9,8 @@ import com.example.photography.model.entity.BorrowRecord;
 import com.example.photography.model.entity.Equipment;
 import com.example.photography.model.entity.User;
 import com.example.photography.model.enums.BorrowStatus;
+import com.example.photography.model.enums.BorrowerType;
+import com.example.photography.model.enums.UserRole;
 import com.example.photography.repository.BorrowRecordRepository;
 import com.example.photography.repository.EquipmentRepository;
 import com.example.photography.service.AnnouncementService;
@@ -77,6 +79,9 @@ public class BorrowServiceImpl implements BorrowService {
     @Override
     public BorrowRecord submitBorrowRequest(Long userId, BorrowRequest request) {
         User user = userService.findById(userId);
+        if (user.getRole() == UserRole.ADVISOR) {
+            throw new org.springframework.security.access.AccessDeniedException("指导老师身份为只读，不能提交借用申请");
+        }
         Equipment equipment = equipmentService.findById(request.getEquipmentId());
         
         // 检查设备状态，损坏的设备不能借用
@@ -97,6 +102,16 @@ public class BorrowServiceImpl implements BorrowService {
         // 创建借用记录
         BorrowRecord record = new BorrowRecord(user, equipment, request.getQuantity(), request.getExpectedReturnTime());
         record.setBorrowReason(request.getBorrowReason());
+        BorrowerType borrowerType = request.getBorrowerType() == null ? BorrowerType.INTERNAL : request.getBorrowerType();
+        record.setBorrowerType(borrowerType);
+        if (borrowerType == BorrowerType.EXTERNAL) {
+            validateExternalBorrower(request);
+            record.setExternalBorrowerType(request.getExternalBorrowerType());
+            record.setExternalOrganization(request.getExternalOrganization().trim());
+            record.setExternalContactName(request.getExternalContactName().trim());
+            record.setExternalPhone(request.getExternalPhone().trim());
+            record.setExternalEmail(request.getExternalEmail().trim().toLowerCase());
+        }
         record.setStatus(BorrowStatus.PENDING);
         
         return borrowRecordRepository.save(record);
@@ -107,6 +122,9 @@ public class BorrowServiceImpl implements BorrowService {
     public BorrowRecord approveBorrowRequest(Long recordId, Long approverId, BorrowApprovalRequest request) {
         BorrowRecord record = findById(recordId);
         User approver = userService.findById(approverId);
+        if (!canApprove(approver, record.getUser())) {
+            throw new org.springframework.security.access.AccessDeniedException("无权审批该借用申请");
+        }
         
         // 检查记录状态
         if (record.getStatus() != BorrowStatus.PENDING) {
@@ -764,6 +782,12 @@ public class BorrowServiceImpl implements BorrowService {
         response.setReturnImages(record.getReturnImages());
         response.setCreatedAt(record.getCreatedAt());
         response.setUpdatedAt(record.getUpdatedAt());
+        response.setBorrowerType(record.getBorrowerType());
+        response.setExternalBorrowerType(record.getExternalBorrowerType());
+        response.setExternalOrganization(record.getExternalOrganization());
+        response.setExternalContactName(record.getExternalContactName());
+        response.setExternalPhone(record.getExternalPhone());
+        response.setExternalEmail(record.getExternalEmail());
         
         // 创建用户信息对象
         if (record.getUser() != null) {
@@ -795,6 +819,25 @@ public class BorrowServiceImpl implements BorrowService {
         }
         
         return response;
+    }
+
+    private void validateExternalBorrower(BorrowRequest request) {
+        if (request.getExternalBorrowerType() == null) throw new IllegalArgumentException("请选择外部借用人类型");
+        if (request.getExternalOrganization() == null || request.getExternalOrganization().isBlank()) throw new IllegalArgumentException("请填写学院、部门或老师单位");
+        if (request.getExternalContactName() == null || request.getExternalContactName().isBlank()) throw new IllegalArgumentException("请填写外部联系人姓名");
+        if (request.getExternalPhone() == null || !request.getExternalPhone().matches("^1[3-9]\\d{9}$")) throw new IllegalArgumentException("请输入有效外部联系手机号");
+        if (request.getExternalEmail() == null || !request.getExternalEmail().matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) throw new IllegalArgumentException("请输入有效外部联系邮箱");
+    }
+
+    private boolean canApprove(User approver, User applicant) {
+        UserRole role = approver.getRole();
+        if (role.isSuperAdmin()) return !approver.getId().equals(applicant.getId());
+        if (applicant.getRole() == UserRole.MEMBER) {
+            if (role == UserRole.DIRECTOR) return true;
+            return role == UserRole.MINISTER && approver.getDepartment() != null && applicant.getDepartment() != null
+                    && approver.getDepartment().getId().equals(applicant.getDepartment().getId());
+        }
+        return applicant.getRole() == UserRole.MINISTER && role == UserRole.DIRECTOR;
     }
     
     /**

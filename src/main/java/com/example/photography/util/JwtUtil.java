@@ -30,9 +30,14 @@ public class JwtUtil {
      * 生成JWT token
      */
     public String generateToken(String username, String role, Long userId) {
+        return generateToken(username, role, userId, 0);
+    }
+
+    public String generateToken(String username, String role, Long userId, Integer tokenVersion) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", role);
         claims.put("userId", userId);
+        claims.put("tokenVersion", tokenVersion == null ? 0 : tokenVersion);
         return createToken(claims, username);
     }
     
@@ -90,6 +95,11 @@ public class JwtUtil {
         Claims claims = getClaimsFromToken(token);
         return claims.get("role").toString();
     }
+
+    public Integer getTokenVersionFromToken(String token) {
+        Object value = getClaimsFromToken(token).get("tokenVersion");
+        return value == null ? 0 : Integer.valueOf(value.toString());
+    }
     
     /**
      * 从token中获取过期时间
@@ -142,7 +152,8 @@ public class JwtUtil {
             String username = claims.getSubject();
             String role = claims.get("role").toString();
             Long userId = Long.valueOf(claims.get("userId").toString());
-            return generateToken(username, role, userId);
+            Integer tokenVersion = getTokenVersionFromToken(token);
+            return generateToken(username, role, userId, tokenVersion);
         } catch (Exception e) {
             return null;
         }

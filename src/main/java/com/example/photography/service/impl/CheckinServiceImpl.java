@@ -39,6 +39,9 @@ public class CheckinServiceImpl implements CheckinService {
     
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private CheckinDeviceUsageRepository checkinDeviceUsageRepository;
     
     private final ObjectMapper objectMapper = new ObjectMapper();
     
@@ -191,6 +194,8 @@ public class CheckinServiceImpl implements CheckinService {
                     && existingRecord.get().getStatus() != CheckinRecord.CheckinStatus.LEAVE) {
                 throw new RuntimeException("今日已签到，请勿重复签到");
             }
+
+            claimDeviceSlot(request, configuration, user, today);
             
             // 创建签到记录；如果原记录是请假占位，允许用户实际到场后覆盖为签到记录
             CheckinRecord record = existingRecord.orElseGet(CheckinRecord::new);
@@ -261,6 +266,41 @@ public class CheckinServiceImpl implements CheckinService {
         } catch (Exception e) {
             log.error("签到失败: {}", e.getMessage(), e);
             throw new RuntimeException("签到失败: " + e.getMessage());
+        }
+    }
+
+    private void claimDeviceSlot(CheckinRequest request, CheckinConfiguration configuration, User user, LocalDate date) {
+        if (request.getDeviceInfo() == null || request.getDeviceInfo().getDeviceFingerprint() == null
+                || request.getDeviceInfo().getDeviceFingerprint().isBlank()) {
+            throw new RuntimeException("签到需要提供设备指纹");
+        }
+        String fingerprintHash = sha256(request.getDeviceInfo().getDeviceFingerprint());
+        Optional<CheckinDeviceUsage> existing = checkinDeviceUsageRepository
+                .findByConfigurationIdAndUsageDateAndDeviceFingerprintHashAndDeletedFalse(
+                        configuration.getId(), date, fingerprintHash);
+        if (existing.isPresent() && !existing.get().getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("该设备已由其他账号在当前打卡时段使用");
+        }
+        if (existing.isEmpty()) {
+            CheckinDeviceUsage usage = new CheckinDeviceUsage();
+            usage.setConfiguration(configuration);
+            usage.setUser(user);
+            usage.setUsageDate(date);
+            usage.setDeviceFingerprintHash(fingerprintHash);
+            try {
+                checkinDeviceUsageRepository.saveAndFlush(usage);
+            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                throw new RuntimeException("该设备已由其他账号在当前打卡时段使用");
+            }
+        }
+    }
+
+    private String sha256(String value) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("无法处理设备指纹", e);
         }
     }
     

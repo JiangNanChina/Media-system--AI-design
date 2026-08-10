@@ -1,14 +1,32 @@
 # Photography Management System
 
-一个前后端分离的融媒体/摄影设备管理系统，后端基于 Spring Boot 3，前端基于 Vue 3、Vite、Element Plus 和 Pinia。系统围绕摄影器材资产、借还审批、晚自习签到、办公执勤、请假审批、公告发布、用户与部门管理等日常管理场景构建。
+## 项目简介
+
+Photography Management System 是一套面向校园融媒体中心的综合管理平台，用于把公开展示、内容投稿、摄影器材、人员组织、值班考勤和日常审批集中到同一个系统中管理。系统采用前后端分离架构，后端基于 Spring Boot 3、Spring Security 和 Spring Data JPA 提供 RESTful API，前端基于 Vue 3、Vite、Element Plus 和 Pinia 构建管理端与游客端页面。
+
+项目服务的核心对象包括游客、投稿人、部员、部长、主任、指导老师和系统超级管理员。游客可以浏览融媒体中心公开落地页并提交视频素材，成员可以完成登录、借还设备、晚自习签到、办公执勤和请假申请，管理角色可以进行账号审核、部门管理、投稿审核、设备维护、公告发布、站点配置和数据导出。
+
+系统重点关注校园场景下的安全与可维护性：注册账号默认进入审核流程，访问令牌短时有效，刷新令牌通过 HttpOnly Cookie 轮换，敏感配置支持加密保存，投稿视频存放在私有目录，生产环境通过独立配置文件和环境变量控制数据库、JWT、维护通行和配置加密密钥。
+
+## 本次更新
+
+- 新增游客可访问的融媒体落地页，支持首屏媒体、校园特色、部门风采、投稿入口、抖音/微信入口等内容配置。
+- 新增视频投稿流程，支持 QQ 邮箱验证码、MP4/MOV/WebM 上传、500MB 文件限制、私有目录保存、后台审核、下载和邮件通知。
+- 重构认证与账号安全，加入待审核注册、账号启停、登录失败锁定、找回密码、验证码限流、15 分钟访问令牌和 7 天旋转刷新令牌。
+- 引入 `SUPER_ADMIN`、`ADVISOR` 等更清晰的角色模型，新增超级管理员账号审核、部门分配和角色调整能力，并兼容旧 `ADMIN` 数据。
+- 新增维护模式，支持公开状态查询、维护通行页、两小时通行 Cookie，以及超级管理员维护配置。
+- 扩展借还业务，支持内部/外部借用人类型、外部借用人信息、归还图片和导出字段补充。
+- 补充数据库升级脚本与升级说明，新增媒体系统结构迁移和可选历史业务数据清理脚本。
+- 完善前端路由、请求层和会话恢复逻辑，新增落地页管理、投稿管理、注册审核、找回密码和维护页等页面。
+- 新增 Vitest、Vue Test Utils 和 Playwright 配置，覆盖路由守卫、用户状态、公开页面、维护模式和核心前端流程。
 
 ## 功能概览
 
 ### 用户与权限
 
-- 支持登录、注册、Token 刷新、当前用户信息查询和 Token 校验。
-- 使用 Spring Security + JWT 做认证授权，前端通过路由守卫控制登录态和管理员页面访问。
-- 用户角色包含普通成员与管理员，管理员可维护用户、部门、设备分类、站点配置等后台数据。
+- 支持待审核注册、登录锁定、密码找回、15 分钟访问令牌和 7 天旋转刷新令牌。
+- 访问令牌只保存在 Pinia 内存，刷新令牌使用哈希入库并通过 HttpOnly/Secure/SameSite Cookie 传递。
+- 用户角色包含部员、部长、主任、指导老师和系统超级管理员，权限同时在前端路由与后端接口校验。
 - 支持用户头像上传、个人资料维护、修改密码、重置密码、启停账号。
 
 ### 部门与组织
@@ -52,6 +70,13 @@
 - 支持公告公开列表、分页、登录弹窗公告、最新公告、详情、搜索、我的公告、浏览量修复和统计。
 - 管理员可创建和维护公告。
 - 支持站点标题、Logo、背景图、邮件配置等站点配置，应用启动时自动初始化默认站点配置。
+
+### 公开站点与视频投稿
+
+- `/` 是游客可访问的校园融媒体落地页，可配置视频/图片首屏、校园特色、部门风采、投稿说明、抖音和微信入口。
+- `/submission` 支持 QQ 邮箱验证和 MP4/MOV/WebM 私有视频投稿，单文件最大 500MB，并显示上传进度。
+- 部长、主任和超级管理员可审核、下载投稿，投稿文件不会通过静态目录公开。
+- 支持维护模式和两小时维护通行 Cookie，落地页在维护期间保持可访问。
 
 ### 设备绑定与审计
 
@@ -146,9 +171,10 @@
 | --- | --- | --- |
 | `DB_URL` | `jdbc:mysql://localhost:3306/photography_system...` | MySQL 连接地址 |
 | `DB_USERNAME` | `root` | 数据库用户名 |
-| `DB_PASSWORD` | 空 | 数据库密码 |
-| `JWT_SECRET` | `change-me-to-a-strong-512-bit-secret-before-deploy` | JWT 密钥，生产环境必须替换 |
-| `ADMIN_SECRET_KEY` | `change-me-before-deploy` | 管理员注册密钥，生产环境必须替换 |
+| `DB_PASSWORD` | 仅开发配置为 `123456` | 生产数据库密码 |
+| `JWT_SECRET` | 仅开发环境有本地值 | 访问令牌签名密钥，生产环境必填 |
+| `MAINTENANCE_TOKEN_SECRET` | 仅开发环境有本地值 | 维护通行凭证签名密钥，生产环境必填 |
+| `CONFIG_ENCRYPTION_KEY` | 仅开发环境有本地值 | QQ SMTP 授权码 AES-GCM 加密密钥，生产环境必填 |
 | `AMAP_WEB_API_KEY` | 空 | 高德 Web 服务 API Key |
 | `AMAP_JS_API_KEY` | 空 | 高德 JS API Key |
 
@@ -218,9 +244,10 @@ http://localhost:3000
 
 ### 4. 注册与登录
 
-- 普通用户可通过 `/register` 注册。
-- 管理员注册需要 `ADMIN_SECRET_KEY`。
-- 登录成功后前端会将 JWT 和用户信息保存到 `localStorage`，路由守卫会在 Token 过期前自动拦截并跳转登录页。
+- 游客通过 `/register` 完成 QQ 邮箱验证后提交部员账号申请。
+- 新账号状态为 `PENDING`，超级管理员分配部门并审核通过后才能登录。
+- 角色提升只能由超级管理员操作，前端不提供旧 `ADMIN` 身份。
+- 登录后的管理首页为 `/dashboard`；访问令牌只存在当前页面内存中，页面重载时通过刷新 Cookie 恢复会话。
 
 ## 常用脚本
 
@@ -248,6 +275,9 @@ npm run dev
 # 生产构建
 npm run build
 
+# 前端单元测试与覆盖率
+npm run test:coverage
+
 # 本地预览构建产物
 npm run preview
 ```
@@ -259,8 +289,10 @@ npm run preview
 | 模块 | 路径前缀 | 说明 |
 | --- | --- | --- |
 | 认证 | `/auth` | 登录、注册、刷新、校验、邮箱验证码 |
+| 账号审核 | `/accounts/admin` | 待审核账号、审核通过/驳回、角色调整 |
 | 用户 | `/users` | 用户列表、资料、头像、密码、统计 |
 | 部门 | `/departments` | 部门列表、搜索、详情、统计 |
+| 部门成员 | `/department-members` | 部长与管理角色维护部门成员信息 |
 | 器材 | `/equipment` | 器材列表、搜索、库存、图片、统计 |
 | 器材分类 | `/equipment-categories` | 分类列表、启停、统计 |
 | 借还 | `/borrows` | 借用申请、审批、归还、统计、导出 |
@@ -273,6 +305,9 @@ npm run preview
 | 请假 | `/leave-requests` | 请假提交、审批、取消、统计、导出 |
 | 设备绑定 | `/devices` | 我的设备、后台设备列表、清理和统计 |
 | 站点配置 | `/site-config` | 公开站点配置、后台配置、图片上传、邮件测试 |
+| 公开落地页 | `/landing` | 游客落地页内容、后台内容项和媒体上传 |
+| 视频投稿 | `/submissions` | 投稿邮箱验证码、视频提交、审核和下载 |
+| 维护模式 | `/maintenance` | 维护状态、通行验证和后台维护配置 |
 | 图片 | `/images` | 器材、头像、归还、站点图片访问 |
 | Excel 导出 | `/export` | 通用导出与模板下载 |
 | 高德地图 | `/amap` | 地理编码、搜索、路线、定位、距离和位置校验 |
@@ -281,9 +316,13 @@ npm run preview
 
 主要页面包括：
 
+- `/`：游客落地页
+- `/submission`：视频投稿
+- `/forgot-password`：找回密码
+- `/maintenance`：维护通行验证
 - `/login`、`/register`：统一认证页
 - `/dashboard`：首页
-- `/user/list`：用户管理
+- `/user/list`、`/user/review`：用户管理与注册审核
 - `/department/list`：部门管理
 - `/equipment/list`、`/equipment/categories`：器材与分类管理
 - `/borrow/list`：借还记录
@@ -291,7 +330,8 @@ npm run preview
 - `/checkin/main`、`/checkin/records`、`/checkin/qr-generator`、`/checkin/audit`、`/checkin/configuration`、`/checkin/attendance`：晚自习签到与考勤
 - `/duty/checkin`、`/duty/list`、`/duty/records`、`/duty/statistics`：办公执勤
 - `/leave/list`：请假管理
-- `/devices/my`、`/devices/admin`、`/devices/site-config`：设备绑定与站点配置
+- `/devices/my`、`/devices/admin`、`/devices/site-config`、`/devices/landing-config`：设备绑定、站点配置与落地页配置
+- `/submission-management`：视频投稿审核
 - `/profile`：个人中心
 
 ## 文件上传与静态资源
@@ -301,25 +341,29 @@ npm run preview
 - `uploads/avatars/`：用户头像
 - `uploads/equipment/`：器材图片
 - `uploads/returns/`：归还图片
+- `uploads/site/`：站点 Logo、背景图、落地页图片和公开展示媒体
+
+私有上传路径默认在项目根目录 `private-uploads/` 下：
+
+- `private-uploads/submissions/`：视频投稿原始文件，仅通过带权限的下载接口访问
 
 前端开发环境通过 Vite 代理访问 `/uploads`，后端实际使用 `/api` 上下文处理资源。
 
 ## 测试情况
 
-后端已有 JUnit 5 测试，覆盖应用启动、AOP 依赖、JWT 工具、邮件配置、邮箱验证码、请假服务、用户设备服务等。
+后端 JUnit 5 测试覆盖应用启动、JWT、邮箱验证码、验证码限流、维护通行与锁定、请假联动和用户设备。前端使用 Vitest 与 Vue Test Utils，覆盖路由角色守卫、维护跳转、内存访问令牌和刷新会话；核心路由与会话模块执行 80% 行覆盖门槛。
 
 ```bash
 ./mvnw.cmd test
 ```
 
-前端当前 `package.json` 未配置测试脚本。如需补充前端单元测试，建议引入 Vitest 与 Vue Test Utils，优先覆盖登录、路由守卫、请求封装、核心表单和关键管理页面。
+数据库升级和可选历史清理见 `docs/UPGRADE_MEDIA_SYSTEM.md`。历史清理脚本必须显式传入确认变量，应用启动不会自动删除业务数据。
 
 ## 部署建议
 
-- 生产环境必须替换 `JWT_SECRET` 和 `ADMIN_SECRET_KEY`。
+- 生产环境必须提供数据库、JWT、维护签名和配置加密环境变量，缺少任何密钥时应拒绝启动。
 - 使用独立 MySQL 实例并关闭调试级 SQL 日志。
 - 为上传目录配置持久化存储和备份策略。
 - 配置可信 CORS 域名，避免使用过宽的跨域策略。
 - 通过 Spring Boot Actuator 接入健康检查和监控。
 - 前端执行 `npm run build` 后，将 `Photography-UI/dist` 部署到 Nginx 或静态资源服务器，并将 `/api` 反向代理到后端服务。
-

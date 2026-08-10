@@ -12,7 +12,7 @@ public class UserUpdateRequest {
     @Size(min = 3, max = 50, message = "用户名长度必须在3-50个字符之间")
     private String username;
     
-    @Size(min = 6, message = "密码长度不能少于6个字符")
+    @Size(min = 8, max = 72, message = "密码长度必须在8-72个字符之间")
     private String password;
     
     private String realName;

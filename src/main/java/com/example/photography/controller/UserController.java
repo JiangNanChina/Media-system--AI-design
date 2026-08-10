@@ -44,7 +44,7 @@ public class UserController {
     private EmailVerificationService emailVerificationService;
     
     @GetMapping("/list")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "获取所有用户列表", description = "获取所有用户列表（仅管理员）")
     public ApiResponse<List<UserResponse>> getAllUsers() {
         try {
@@ -75,7 +75,7 @@ public class UserController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "分页获取用户列表", description = "分页获取所有用户（仅管理员）")
     public ApiResponse<Page<UserResponse>> getUsers(
             @RequestParam(defaultValue = "0") int page,
@@ -131,7 +131,7 @@ public class UserController {
     }
     
     @GetMapping("/search")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "搜索用户", description = "根据关键字搜索用户（仅管理员）")
     public ApiResponse<Page<UserResponse>> searchUsers(
             @RequestParam String keyword,
@@ -189,7 +189,7 @@ public class UserController {
     }
     
     @GetMapping("/role/{role}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "根据角色获取用户", description = "根据用户角色获取用户列表（仅管理员）")
     public ApiResponse<List<UserResponse>> getUsersByRole(@PathVariable UserRole role) {
         try {
@@ -244,10 +244,16 @@ public class UserController {
     }
     
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "创建用户", description = "创建新用户（仅管理员）")
     public ApiResponse<UserResponse> createUser(@Valid @RequestBody UserCreateRequest request) {
         try {
+            User currentUser = userService.findByUsername(SecurityContextHolder.getContext().getAuthentication().getName());
+            if (currentUser.getRole() != UserRole.SUPER_ADMIN && currentUser.getRole() != UserRole.ADMIN) {
+                request.setRole(UserRole.MEMBER);
+            } else if (request.getRole() == UserRole.ADMIN) {
+                request.setRole(UserRole.SUPER_ADMIN);
+            }
             User user = userService.createUser(request);
             // 重新加载用户以获取部门信息
             User userWithDepartment = userService.findByIdWithDepartment(user.getId());
@@ -282,12 +288,20 @@ public class UserController {
             User currentUser = userService.findByUsername(currentUsername);
             
             // 权限检查：必须是管理员或者修改自己的信息
-            boolean isAdmin = authentication.getAuthorities().stream()
-                    .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+            boolean isSuperAdmin = currentUser.getRole() == UserRole.SUPER_ADMIN || currentUser.getRole() == UserRole.ADMIN;
+            boolean isAdmin = isSuperAdmin || currentUser.getRole() == UserRole.DIRECTOR;
             boolean isOwner = currentUser.getId().equals(id);
             
             if (!isAdmin && !isOwner) {
                 return ApiResponse.error("权限不足：只能修改自己的信息");
+            }
+
+            // 身份提升只能通过超级管理员接口执行，普通用户也不能借此接口修改自己的权限和状态。
+            request.setRole(null);
+            if (!isAdmin) {
+                request.setDepartmentId(null);
+                request.setEnabled(null);
+                request.setPassword(null);
             }
             
             User user = userService.updateUserPartial(id, request);
@@ -312,7 +326,7 @@ public class UserController {
     }
     
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "删除用户", description = "删除指定用户（仅管理员）")
     public ApiResponse<Void> deleteUser(@PathVariable Long id) {
         try {
@@ -324,7 +338,7 @@ public class UserController {
     }
     
     @PutMapping("/batch-enable")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "批量启用用户", description = "批量启用指定用户（仅管理员）")
     public ApiResponse<Void> batchEnableUsers(@Valid @RequestBody BatchUserRequest request) {
         try {
@@ -336,7 +350,7 @@ public class UserController {
     }
     
     @PutMapping("/batch-disable")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "批量禁用用户", description = "批量禁用指定用户（仅管理员）")
     public ApiResponse<Void> batchDisableUsers(@Valid @RequestBody BatchUserRequest request) {
         try {
@@ -407,7 +421,7 @@ public class UserController {
     }
     
     @PostMapping("/{id}/reset-password")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "重置密码", description = "重置用户密码（仅管理员）")
     public ApiResponse<Void> resetPassword(@PathVariable Long id, 
                                          @RequestBody Map<String, String> request) {
@@ -424,20 +438,8 @@ public class UserController {
         }
     }
     
-    @PostMapping("/{id}/reset-password-default")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "重置密码为默认密码", description = "重置用户密码为默认密码123456（仅管理员）")
-    public ApiResponse<Void> resetPasswordToDefault(@PathVariable Long id) {
-        try {
-            userService.resetPasswordToDefault(id);
-            return ApiResponse.success("密码已重置为默认密码");
-        } catch (Exception e) {
-            return ApiResponse.error(e.getMessage());
-        }
-    }
-    
     @PostMapping("/{id}/toggle-status")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "启用/禁用用户", description = "启用或禁用用户账户（仅管理员）")
     public ApiResponse<Void> toggleUserStatus(@PathVariable Long id, 
                                             @RequestBody Map<String, Boolean> request) {
@@ -455,7 +457,7 @@ public class UserController {
     }
     
     @GetMapping("/statistics")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "获取用户统计信息", description = "获取用户统计数据（仅管理员）")
     public ApiResponse<UserService.UserStatistics> getUserStatistics() {
         try {
@@ -575,7 +577,7 @@ public class UserController {
      * 管理员获取用户列表（用于设备管理等）
      */
     @GetMapping("/admin/list")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "管理员获取用户列表", description = "管理员获取所有用户列表，支持批量操作")
     public ApiResponse<List<UserResponse>> getAdminUserList(
             @RequestParam(defaultValue = "1000") int size) {
@@ -643,7 +645,7 @@ public class UserController {
     }
     
     @DeleteMapping("/{id}/physical")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('DIRECTOR','SUPER_ADMIN')")
     @Operation(summary = "物理删除用户", description = "物理删除用户及其所有相关数据（仅管理员）")
     public ApiResponse<Void> physicalDeleteUser(@PathVariable Long id) {
         try {

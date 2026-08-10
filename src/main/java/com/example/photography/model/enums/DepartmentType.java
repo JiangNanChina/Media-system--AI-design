@@ -7,6 +7,7 @@ public enum DepartmentType {
     PHOTOGRAPHY("摄影部"),
     EDITING("采编部"),
     REVIEW("审核部"),
+    OPERATIONS("运营部"),
     PUBLICITY("宣传部"),
     CUSTOM("自定义");
     

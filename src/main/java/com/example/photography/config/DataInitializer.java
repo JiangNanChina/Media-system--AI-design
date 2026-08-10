@@ -1,6 +1,7 @@
 package com.example.photography.config;
 
 import com.example.photography.service.SiteConfigService;
+import com.example.photography.service.LandingService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
@@ -18,6 +19,9 @@ public class DataInitializer implements CommandLineRunner {
     
     @Autowired
     private SiteConfigService siteConfigService;
+
+    @Autowired
+    private LandingService landingService;
     
     @Override
     public void run(String... args) throws Exception {
@@ -27,6 +31,7 @@ public class DataInitializer implements CommandLineRunner {
             // 初始化站点配置
             log.info("初始化站点配置...");
             siteConfigService.initDefaultConfigs();
+            landingService.initializeDefaults();
             log.info("站点配置初始化完成");
             
             log.info("========== 应用数据初始化完成 ==========");
