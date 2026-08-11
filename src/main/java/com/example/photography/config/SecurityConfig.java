@@ -100,10 +100,12 @@ public class SecurityConfig {
                 .requestMatchers("/announcements/public/**").permitAll()  // 公告公开接口
                 .requestMatchers("/site-config/public", "/site-config/public/**").permitAll()  // 站点配置公开接口
                 .requestMatchers("/landing/public", "/maintenance/public/**", "/submissions/public/**").permitAll()
+                .requestMatchers("/join-applications/public/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/uploads/**").permitAll()  // 静态资源
                 .requestMatchers("/images/**").permitAll()  // 优化的图片服务接口
                 .requestMatchers(HttpMethod.GET, "/departments", "/departments/**").permitAll()  // 允许获取部门列表
+                .requestMatchers(HttpMethod.GET, "/colleges", "/colleges/**").permitAll()  // 允许获取学院列表
                 .requestMatchers(HttpMethod.GET, "/equipment-categories/active").permitAll()  // 允许获取激活的设备分类
                 
                 // 管理员接口

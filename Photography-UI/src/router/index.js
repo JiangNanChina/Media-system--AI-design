@@ -1,12 +1,35 @@
 import { useUserStore } from '@/stores/user'
 import request from '@/utils/request'
 
+const maintenanceStatusCache = {
+  checkedAt: 0,
+  data: null
+}
+
+export const resetMaintenanceStatusCache = () => {
+  maintenanceStatusCache.checkedAt = 0
+  maintenanceStatusCache.data = null
+}
+
+const getMaintenanceStatus = async () => {
+  const now = Date.now()
+  if (maintenanceStatusCache.data && now - maintenanceStatusCache.checkedAt < 10_000) {
+    return maintenanceStatusCache.data
+  }
+
+  const response = await request.get('/maintenance/public/status', { silent: true })
+  maintenanceStatusCache.checkedAt = now
+  maintenanceStatusCache.data = response.data || {}
+  return maintenanceStatusCache.data
+}
+
 // 页面组件懒加载
 const Auth = () => import('@/views/Login.vue')  // 现在Login.vue是统一的认证页面
 const Layout = () => import('@/components/Layout.vue')
 const Dashboard = () => import('@/views/Dashboard.vue')
 const UserManagement = () => import('@/views/UserManagement.vue')
 const DepartmentManagement = () => import('@/views/DepartmentManagement.vue')
+const CollegeManagement = () => import('@/views/CollegeManagement.vue')
 const EquipmentManagement = () => import('@/views/EquipmentManagement.vue')
 const CategoryManagement = () => import('@/views/CategoryManagement.vue')
 const BorrowManagement = () => import('@/views/BorrowManagement.vue')
@@ -29,9 +52,11 @@ const NotFound = () => import('@/views/NotFound.vue')
 const LoginTest = () => import('@/views/LoginTest.vue')
 const Landing = () => import('@/views/Landing.vue')
 const VideoSubmission = () => import('@/views/VideoSubmission.vue')
+const JoinUs = () => import('@/views/JoinUs.vue')
 const ForgotPassword = () => import('@/views/ForgotPassword.vue')
 const Maintenance = () => import('@/views/Maintenance.vue')
 const SubmissionManagement = () => import('@/views/SubmissionManagement.vue')
+const JoinApplicationManagement = () => import('@/views/JoinApplicationManagement.vue')
 const LandingManagement = () => import('@/views/LandingManagement.vue')
 const AccountReview = () => import('@/views/AccountReview.vue')
 
@@ -47,6 +72,12 @@ const routes = [
     name: 'VideoSubmission',
     component: VideoSubmission,
     meta: { public: true, title: '视频投稿' }
+  },
+  {
+    path: '/join-us',
+    name: 'JoinUs',
+    component: JoinUs,
+    meta: { public: true, title: '加入我们' }
   },
   {
     path: '/forgot-password',
@@ -128,6 +159,12 @@ const routes = [
         name: 'DepartmentManagement',
         component: DepartmentManagement,
         meta: { title: '部门列表', icon: 'Management' }
+      },
+      {
+        path: 'colleges',
+        name: 'CollegeManagement',
+        component: CollegeManagement,
+        meta: { title: '学院管理', icon: 'School' }
       }
     ]
   },
@@ -336,6 +373,22 @@ const routes = [
     }]
   },
   {
+    path: '/join-applications',
+    component: Layout,
+    meta: {
+      requiresAuth: true,
+      roles: ['MINISTER', 'DIRECTOR', 'SUPER_ADMIN', 'ADMIN'],
+      title: '入部申请',
+      icon: 'UserFilled'
+    },
+    children: [{
+      path: '',
+      name: 'JoinApplicationManagement',
+      component: JoinApplicationManagement,
+      meta: { title: '申请审核', icon: 'DocumentChecked' }
+    }]
+  },
+  {
     path: '/404',
     name: 'NotFound',
     component: NotFound,
@@ -364,8 +417,8 @@ export const setupRouterGuards = (router) => {
     
     if (!to.meta.public && to.path !== '/maintenance') {
       try {
-        const maintenance = await request.get('/maintenance/public/status', { silent: true })
-        if (maintenance.data?.enabled && !maintenance.data?.unlocked) {
+        const maintenance = await getMaintenanceStatus()
+        if (maintenance.enabled && !maintenance.unlocked) {
           next({ path: '/maintenance', query: { redirect: to.fullPath } })
           return
         }

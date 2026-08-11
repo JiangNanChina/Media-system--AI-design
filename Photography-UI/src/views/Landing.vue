@@ -14,6 +14,7 @@
         <a href="#features">{{ setting('landing.nav.features_label', '校园特色') }}</a>
         <a href="#showcase">{{ setting('landing.nav.showcase_label', '部门风采') }}</a>
         <router-link to="/submission">{{ setting('landing.nav.submission_label', '视频投稿') }}</router-link>
+        <router-link to="/join-us">加入我们</router-link>
       </nav>
 
       <el-button class="nav-login" type="primary" @click="enterPlatform">
@@ -55,6 +56,10 @@
             <el-button type="primary" size="large" @click="$router.push('/submission')">
               <el-icon><UploadFilled /></el-icon>
               {{ setting('landing.hero.primary_cta', '视频投稿') }}
+            </el-button>
+            <el-button size="large" plain @click="$router.push('/join-us')">
+              <el-icon><UserFilled /></el-icon>
+              加入我们
             </el-button>
             <el-button size="large" plain @click="scrollTo('features')">{{ setting('landing.hero.secondary_cta', '了解我们') }}</el-button>
           </div>
@@ -307,6 +312,7 @@ import {
   Right,
   School,
   UploadFilled,
+  UserFilled,
   VideoCamera
 } from '@element-plus/icons-vue'
 import request from '@/utils/request'

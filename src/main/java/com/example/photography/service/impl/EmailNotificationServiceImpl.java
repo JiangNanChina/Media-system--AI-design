@@ -5,6 +5,7 @@ import com.example.photography.model.entity.CheckinConfiguration;
 import com.example.photography.model.entity.DutySchedule;
 import com.example.photography.model.entity.EmailNotificationLog;
 import com.example.photography.model.entity.Equipment;
+import com.example.photography.model.entity.JoinApplication;
 import com.example.photography.model.entity.LeaveRequest;
 import com.example.photography.model.entity.SiteConfig;
 import com.example.photography.model.entity.User;
@@ -47,6 +48,7 @@ public class EmailNotificationServiceImpl implements EmailNotificationService {
     private static final String TYPE_CHECKIN_REMINDER = "CHECKIN_REMINDER";
     private static final String TYPE_LEAVE_APPROVAL = "LEAVE_APPROVAL";
     private static final String TYPE_LEAVE_APPROVED = "LEAVE_APPROVED";
+    private static final String TYPE_JOIN_INTERVIEW = "JOIN_INTERVIEW";
     private static final String TYPE_BORROW_OVERDUE = "BORROW_OVERDUE";
     private static final String TYPE_TEST_MAIL = "TEST_MAIL";
 
@@ -166,6 +168,61 @@ public class EmailNotificationServiceImpl implements EmailNotificationService {
         );
 
         sendNotificationOnce(TYPE_LEAVE_APPROVED, "LEAVE_REQUEST", request.getId(), applicant, "approved", subject, content);
+    }
+
+    @Override
+    @Transactional(noRollbackFor = RuntimeException.class)
+    public NotificationResult notifyJoinApplicationInterview(JoinApplication joinApplication) {
+        if (joinApplication == null || joinApplication.getId() == null) {
+            return NotificationResult.fail("入部申请不存在");
+        }
+
+        String recipientEmail = normalizeEmail(joinApplication.getQqEmail());
+        if (!StringUtils.hasText(recipientEmail)) {
+            return NotificationResult.fail("申请人QQ邮箱为空");
+        }
+        if (!mailSettingsService.isMailEnabled()) {
+            return NotificationResult.fail("邮件功能未启用，请先在站点设置中开启QQ邮箱与提醒");
+        }
+        if (!mailSettingsService.isMailConfigured()) {
+            return NotificationResult.fail("QQ邮箱SMTP配置不完整，请在站点设置中填写邮箱账号和授权码");
+        }
+
+        if (emailNotificationLogRepository.existsSuccessfulLog(TYPE_JOIN_INTERVIEW, joinApplication.getId(), recipientEmail, "interview")) {
+            return NotificationResult.ok();
+        }
+
+        EmailNotificationLog logEntity = new EmailNotificationLog();
+        logEntity.setNotificationType(TYPE_JOIN_INTERVIEW);
+        logEntity.setBusinessType("JOIN_APPLICATION");
+        logEntity.setBusinessId(joinApplication.getId());
+        logEntity.setRecipientEmail(recipientEmail);
+        logEntity.setRecipientName(joinApplication.getRealName());
+        logEntity.setPeriodKey("interview");
+        logEntity.setSentAt(LocalDateTime.now());
+
+        String subject = "入部申请进入面试阶段";
+        String content = buildMailContent(
+                "入部申请进入面试阶段",
+                "申请人：" + safe(joinApplication.getRealName()),
+                "申请编号：" + safe(joinApplication.getApplicationNumber()),
+                "面试QQ群：" + safe(joinApplication.getInterviewQqGroup()),
+                "请尽快加入面试QQ群，留意后续面试安排。"
+        );
+
+        try {
+            emailDeliveryService.sendHtmlMail(recipientEmail, subject, content);
+            logEntity.setSuccess(true);
+            emailNotificationLogRepository.save(logEntity);
+            return NotificationResult.ok();
+        } catch (RuntimeException e) {
+            String errorMessage = truncate(e.getMessage(), 1000);
+            logEntity.setSuccess(false);
+            logEntity.setErrorMessage(errorMessage);
+            emailNotificationLogRepository.save(logEntity);
+            log.warn("入部申请面试通知发送失败: applicationId={}, recipient={}", joinApplication.getId(), recipientEmail, e);
+            return NotificationResult.fail(errorMessage);
+        }
     }
 
     @Override

@@ -389,8 +389,13 @@
         class="borrow-request-form"
       >
         <div class="borrow-form-panel">
-          <el-form-item label="借用人类型" prop="borrowerType" class="borrow-form-item">
-            <el-segmented v-model="borrowForm.borrowerType" :options="[{ label: '本人借用', value: 'INTERNAL' }, { label: '代外部人员借用', value: 'EXTERNAL' }]" />
+          <el-form-item label="借用人类型" prop="borrowerType" class="borrow-form-item borrower-type-field">
+            <el-segmented
+              v-model="borrowForm.borrowerType"
+              :options="[{ label: '本人借用', value: 'INTERNAL' }, { label: '代外部人员借用', value: 'EXTERNAL' }]"
+              class="borrower-type-segmented"
+              aria-label="借用人类型"
+            />
             <div class="borrow-field-hint">外部借用由当前账号作为经办人，并按当前账号所属部门审核。</div>
           </el-form-item>
           <el-form-item label="选择设备" prop="equipmentId" class="borrow-form-item equipment-field">
@@ -470,13 +475,37 @@
             </el-form-item>
           </div>
 
-          <div v-if="borrowForm.borrowerType === 'EXTERNAL'" class="external-borrower-fields">
-            <el-form-item label="外部借用类型" prop="externalBorrowerType"><el-select v-model="borrowForm.externalBorrowerType" placeholder="请选择"><el-option label="学院" value="COLLEGE" /><el-option label="校内部门" value="DEPARTMENT" /><el-option label="老师" value="TEACHER" /></el-select></el-form-item>
-            <el-form-item label="学院、部门或单位" prop="externalOrganization"><el-input v-model.trim="borrowForm.externalOrganization" maxlength="150" /></el-form-item>
-            <el-form-item label="联系人姓名" prop="externalContactName"><el-input v-model.trim="borrowForm.externalContactName" maxlength="80" /></el-form-item>
-            <el-form-item label="联系人手机号" prop="externalPhone"><el-input v-model.trim="borrowForm.externalPhone" maxlength="11" /></el-form-item>
-            <el-form-item label="联系人QQ邮箱" prop="externalEmail"><el-input v-model.trim="borrowForm.externalEmail" type="email" maxlength="120" /></el-form-item>
-          </div>
+          <Transition name="external-borrower">
+            <div v-if="borrowForm.borrowerType === 'EXTERNAL'" class="external-borrower-fields">
+              <el-form-item label="外部借用类型" prop="externalBorrowerType"><el-select v-model="borrowForm.externalBorrowerType" placeholder="请选择"><el-option label="学院" value="COLLEGE" /><el-option label="校内部门" value="DEPARTMENT" /><el-option label="老师" value="TEACHER" /></el-select></el-form-item>
+              <el-form-item :label="externalOrganizationLabel" prop="externalOrganization">
+                <el-select
+                  v-if="borrowForm.externalBorrowerType === 'COLLEGE'"
+                  v-model="borrowForm.externalOrganization"
+                  placeholder="请选择学院"
+                  filterable
+                  clearable
+                  no-data-text="请先在学院管理中添加学院"
+                >
+                  <el-option
+                    v-for="college in colleges"
+                    :key="college.id"
+                    :label="college.name"
+                    :value="college.name"
+                  />
+                </el-select>
+                <el-input
+                  v-else
+                  v-model.trim="borrowForm.externalOrganization"
+                  :placeholder="externalOrganizationPlaceholder"
+                  maxlength="150"
+                />
+              </el-form-item>
+              <el-form-item label="联系人姓名" prop="externalContactName"><el-input v-model.trim="borrowForm.externalContactName" maxlength="80" /></el-form-item>
+              <el-form-item label="联系人手机号" prop="externalPhone"><el-input v-model.trim="borrowForm.externalPhone" maxlength="11" /></el-form-item>
+              <el-form-item label="联系人QQ邮箱" prop="externalEmail"><el-input v-model.trim="borrowForm.externalEmail" type="email" maxlength="120" /></el-form-item>
+            </div>
+          </Transition>
           
           <el-form-item label="借用目的" prop="borrowReason" class="borrow-form-item purpose-field">
             <el-input
@@ -1214,6 +1243,7 @@ const exporting = ref(false)
 const cleaning = ref(false)
 const borrowList = ref([])
 const availableEquipment = ref([])
+const colleges = ref([])
 
 // 数据清理相关
 const cleanupStats = ref({})
@@ -1341,6 +1371,17 @@ const maxBorrowQuantity = computed(() => {
   return Math.max(1, available)
 })
 
+const externalOrganizationLabel = computed(() => {
+  if (borrowForm.externalBorrowerType === 'COLLEGE') return '学院'
+  if (borrowForm.externalBorrowerType === 'TEACHER') return '所属单位'
+  return '学院、部门或单位'
+})
+
+const externalOrganizationPlaceholder = computed(() => {
+  if (borrowForm.externalBorrowerType === 'TEACHER') return '请输入老师所属单位'
+  return '请输入学院、部门或单位'
+})
+
 // 表单引用
 const returnFormRef = ref()
 
@@ -1383,7 +1424,16 @@ const borrowRules = {
     { min: 5, max: 200, message: '借用目的长度在 5 到 200 个字符', trigger: 'blur' }
   ],
   externalBorrowerType: [{ validator: (_rule, value, callback) => borrowForm.borrowerType !== 'EXTERNAL' || value ? callback() : callback(new Error('请选择外部借用类型')), trigger: 'change' }],
-  externalOrganization: [{ validator: (_rule, value, callback) => borrowForm.borrowerType !== 'EXTERNAL' || value?.trim() ? callback() : callback(new Error('请填写学院、部门或单位')), trigger: 'blur' }],
+  externalOrganization: [{
+    validator: (_rule, value, callback) => {
+      if (borrowForm.borrowerType !== 'EXTERNAL' || value?.trim()) {
+        callback()
+        return
+      }
+      callback(new Error(borrowForm.externalBorrowerType === 'COLLEGE' ? '请选择学院' : '请填写学院、部门或单位'))
+    },
+    trigger: ['blur', 'change']
+  }],
   externalContactName: [{ validator: (_rule, value, callback) => borrowForm.borrowerType !== 'EXTERNAL' || value?.trim() ? callback() : callback(new Error('请填写联系人姓名')), trigger: 'blur' }],
   externalPhone: [{ validator: (_rule, value, callback) => borrowForm.borrowerType !== 'EXTERNAL' || /^1[3-9]\d{9}$/.test(value) ? callback() : callback(new Error('请输入有效手机号')), trigger: 'blur' }],
   externalEmail: [{ validator: (_rule, value, callback) => borrowForm.borrowerType !== 'EXTERNAL' || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value) ? callback() : callback(new Error('请输入有效邮箱')), trigger: 'blur' }]
@@ -1461,6 +1511,15 @@ const fetchAvailableEquipment = async () => {
     }
   } catch (error) {
     console.error('获取可用设备失败:', error)
+  }
+}
+
+const fetchColleges = async () => {
+  try {
+    const response = await request.get('/colleges/list', { silent: true })
+    colleges.value = response.data || []
+  } catch (error) {
+    console.error('获取学院列表失败:', error)
   }
 }
 
@@ -2026,6 +2085,28 @@ watch(
   }
 )
 
+watch(
+  () => borrowForm.borrowerType,
+  (borrowerType) => {
+    if (borrowerType !== 'EXTERNAL') {
+      borrowForm.externalBorrowerType = ''
+      borrowForm.externalOrganization = ''
+      borrowForm.externalContactName = ''
+      borrowForm.externalPhone = ''
+      borrowForm.externalEmail = ''
+    }
+  }
+)
+
+watch(
+  () => borrowForm.externalBorrowerType,
+  (newType, oldType) => {
+    if (newType !== oldType) {
+      borrowForm.externalOrganization = ''
+    }
+  }
+)
+
 // 数据清理相关方法
 const fetchCleanupStatistics = async () => {
   try {
@@ -2259,6 +2340,7 @@ const handleResize = () => {
 
 onMounted(() => {
   fetchAvailableEquipment()
+  fetchColleges()
   
   // 初始检查移动端
   checkMobile()
@@ -2277,17 +2359,68 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0 16px;
+  max-height: 360px;
   padding: 18px;
   margin-bottom: 18px;
   background: rgba(21, 133, 173, 0.06);
   border: 1px solid rgba(21, 133, 173, 0.18);
   border-radius: 6px;
+  overflow: hidden;
+  transform-origin: top;
+  will-change: opacity, transform, max-height;
 }
 
 .external-borrower-fields .el-select { width: 100%; }
 
+.external-borrower-enter-active,
+.external-borrower-leave-active {
+  overflow: hidden;
+  transition:
+    max-height 280ms var(--easing-ease),
+    opacity 220ms var(--easing-ease),
+    transform 240ms var(--easing-ease),
+    padding 280ms var(--easing-ease),
+    margin-bottom 280ms var(--easing-ease),
+    border-color 240ms var(--easing-ease);
+}
+
+.external-borrower-enter-from,
+.external-borrower-leave-to {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
+  opacity: 0;
+  border-color: rgba(21, 133, 173, 0);
+  transform: translateY(-8px);
+}
+
+.external-borrower-enter-to,
+.external-borrower-leave-from {
+  max-height: 360px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .external-borrower-fields,
+  .external-borrower-enter-active,
+  .external-borrower-leave-active {
+    transition: none;
+    transform: none;
+  }
+}
+
 @media (max-width: 640px) {
-  .external-borrower-fields { grid-template-columns: 1fr; }
+  .external-borrower-fields {
+    grid-template-columns: 1fr;
+    max-height: 520px;
+  }
+
+  .external-borrower-enter-to,
+  .external-borrower-leave-from {
+    max-height: 520px;
+  }
 }
 /* 归还对话框样式 */
 .return-dialog .el-dialog__body {
@@ -3680,6 +3813,71 @@ onUnmounted(() => {
   border-color: rgba(98, 177, 210, 0.2);
 }
 
+.borrower-type-segmented {
+  --el-segmented-bg-color: rgba(255, 255, 255, 0.74);
+  --el-segmented-color: #496579;
+  --el-segmented-item-hover-bg-color: rgba(232, 249, 255, 0.88);
+  --el-segmented-item-hover-color: #0876a5;
+  --el-segmented-item-active-bg-color: rgba(210, 242, 252, 0.9);
+  --el-segmented-item-selected-bg-color: var(--button-primary-bg);
+  --el-segmented-item-selected-color: #0876a5;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 42px;
+  padding: 4px;
+  border: 1px solid rgba(98, 177, 210, 0.2);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.88), 0 8px 18px rgba(18, 174, 231, 0.07);
+}
+
+.borrower-type-segmented :deep(.el-segmented__group) {
+  gap: 4px;
+}
+
+.borrower-type-segmented :deep(.el-segmented__item) {
+  min-width: 108px;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 12px;
+  color: #496579;
+  font-size: 13px;
+  font-weight: 800;
+  transition: background-color var(--duration-fast) var(--easing-ease), color var(--duration-fast) var(--easing-ease);
+}
+
+.borrower-type-segmented :deep(.el-segmented__item-selected) {
+  border: 1px solid var(--button-primary-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 18px rgba(24, 185, 236, 0.12);
+}
+
+.borrower-type-segmented :deep(.el-segmented__item.is-selected) {
+  color: #0876a5;
+}
+
+.borrower-type-segmented :deep(.el-segmented__item.is-focus-visible .el-segmented__item-label) {
+  outline: 2px solid rgba(24, 185, 236, 0.32);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.borrower-type-segmented :deep(.el-segmented__item-label) {
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.borrower-type-field :deep(.el-form-item__content) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.borrower-type-field .borrow-field-hint {
+  flex: 1 1 220px;
+  margin-top: 0;
+  line-height: 1.5;
+}
+
 .purpose-field {
   margin-bottom: 0 !important;
 }
@@ -3914,6 +4112,25 @@ onUnmounted(() => {
   .borrow-form-grid {
     grid-template-columns: 1fr;
     gap: 0;
+  }
+
+  .borrower-type-field :deep(.el-form-item__content) {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .borrower-type-field .borrow-field-hint {
+    flex: none;
+  }
+
+  .borrower-type-segmented {
+    width: 100%;
+  }
+
+  .borrower-type-segmented :deep(.el-segmented__item) {
+    min-width: 0;
+    padding: 0 10px;
   }
 
   .selected-equipment-panel {

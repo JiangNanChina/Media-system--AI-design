@@ -209,6 +209,11 @@
                 <el-switch v-model="mailForm.borrowOverdueReminderEnabled" />
               </el-form-item>
             </el-col>
+            <el-col :xs="24" :md="8">
+              <el-form-item label="入部面试QQ群">
+                <el-input v-model.trim="mailForm.joinInterviewQqGroup" maxlength="12" placeholder="请输入面试QQ群号" clearable />
+              </el-form-item>
+            </el-col>
           </el-row>
 
           <div class="mail-actions">
@@ -258,6 +263,7 @@
             <el-option label="晚自习打卡提醒" value="CHECKIN_REMINDER" />
             <el-option label="请假审批提醒" value="LEAVE_APPROVAL" />
             <el-option label="请假通过通知" value="LEAVE_APPROVED" />
+            <el-option label="入部面试通知" value="JOIN_INTERVIEW" />
             <el-option label="设备逾期提醒" value="BORROW_OVERDUE" />
           </el-select>
           <el-select
@@ -532,7 +538,8 @@ const mailForm = reactive({
   dutyReminderEnabled: true,
   checkinReminderEnabled: true,
   leaveApprovalReminderEnabled: true,
-  borrowOverdueReminderEnabled: true
+  borrowOverdueReminderEnabled: true,
+  joinInterviewQqGroup: ''
 })
 
 const mailConfigDefinitions = [
@@ -548,7 +555,8 @@ const mailConfigDefinitions = [
   { field: 'dutyReminderEnabled', key: 'mail.duty_reminder_enabled', description: '执勤提醒开关', configType: 'BOOLEAN', defaultValue: true },
   { field: 'checkinReminderEnabled', key: 'mail.checkin_reminder_enabled', description: '晚自习打卡提醒开关', configType: 'BOOLEAN', defaultValue: true },
   { field: 'leaveApprovalReminderEnabled', key: 'mail.leave_approval_reminder_enabled', description: '请假审批提醒开关', configType: 'BOOLEAN', defaultValue: true },
-  { field: 'borrowOverdueReminderEnabled', key: 'mail.borrow_overdue_reminder_enabled', description: '设备逾期归还提醒开关', configType: 'BOOLEAN', defaultValue: true }
+  { field: 'borrowOverdueReminderEnabled', key: 'mail.borrow_overdue_reminder_enabled', description: '设备逾期归还提醒开关', configType: 'BOOLEAN', defaultValue: true },
+  { field: 'joinInterviewQqGroup', key: 'join.interview_qq_group', description: '入部面试QQ群号', configType: 'TEXT', defaultValue: '' }
 ]
 
 // API基础URL
@@ -801,6 +809,11 @@ const validateMailSettings = ({ requireAuthCode = false } = {}) => {
   }
   if (requireAuthCode && !mailAuthCodeConfigured.value && !String(mailForm.qqAuthCode || '').trim()) {
     ElMessage.warning('请填写QQ邮箱SMTP授权码，授权码不是QQ登录密码')
+    return false
+  }
+  const joinInterviewQqGroup = String(mailForm.joinInterviewQqGroup || '').trim()
+  if (joinInterviewQqGroup && !/^\d{5,12}$/.test(joinInterviewQqGroup)) {
+    ElMessage.warning('入部面试QQ群号必须是5到12位数字')
     return false
   }
   return true

@@ -12,7 +12,7 @@ const requestGet = vi.fn()
 vi.mock('@/stores/user', () => ({ useUserStore: () => userStore }))
 vi.mock('@/utils/request', () => ({ default: { get: requestGet } }))
 
-const { setupRouterGuards } = await import('./index.js')
+const { resetMaintenanceStatusCache, setupRouterGuards } = await import('./index.js')
 
 const installGuard = () => {
   let guard
@@ -29,6 +29,7 @@ const navigate = async (guard, to) => {
 describe('route access guard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    resetMaintenanceStatusCache()
     Object.assign(userStore, { role: '', isLoggedIn: false, canManageBusiness: false })
     userStore.checkTokenValidity.mockReturnValue(false)
     requestGet.mockResolvedValue({ data: { enabled: false, unlocked: false } })
@@ -75,4 +76,3 @@ describe('route access guard', () => {
     expect(redirected).toHaveBeenCalledWith('/dashboard')
   })
 })
-

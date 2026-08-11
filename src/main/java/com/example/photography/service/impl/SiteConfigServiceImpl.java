@@ -280,7 +280,8 @@ public class SiteConfigServiceImpl implements SiteConfigService {
                 SiteConfig.Keys.MAIL_DUTY_REMINDER_ENABLED,
                 SiteConfig.Keys.MAIL_CHECKIN_REMINDER_ENABLED,
                 SiteConfig.Keys.MAIL_LEAVE_APPROVAL_REMINDER_ENABLED,
-                SiteConfig.Keys.MAIL_BORROW_OVERDUE_REMINDER_ENABLED
+                SiteConfig.Keys.MAIL_BORROW_OVERDUE_REMINDER_ENABLED,
+                SiteConfig.Keys.JOIN_INTERVIEW_QQ_GROUP
             );
             
             List<SiteConfig> allConfigs = getAllConfigs();
@@ -350,6 +351,7 @@ public class SiteConfigServiceImpl implements SiteConfigService {
         createDefaultConfigIfNotExists(SiteConfig.Keys.MAIL_CHECKIN_REMINDER_ENABLED, "true", "晚自习打卡提醒开关", SiteConfig.ConfigType.BOOLEAN);
         createDefaultConfigIfNotExists(SiteConfig.Keys.MAIL_LEAVE_APPROVAL_REMINDER_ENABLED, "true", "请假审批提醒开关", SiteConfig.ConfigType.BOOLEAN);
         createDefaultConfigIfNotExists(SiteConfig.Keys.MAIL_BORROW_OVERDUE_REMINDER_ENABLED, "true", "设备逾期归还提醒开关", SiteConfig.ConfigType.BOOLEAN);
+        createDefaultConfigIfNotExists(SiteConfig.Keys.JOIN_INTERVIEW_QQ_GROUP, "", "入部面试QQ群号", SiteConfig.ConfigType.TEXT);
     }
 
     private void resetMailConfigDefaults() {
@@ -366,6 +368,7 @@ public class SiteConfigServiceImpl implements SiteConfigService {
         resetConfigToDefault(SiteConfig.Keys.MAIL_CHECKIN_REMINDER_ENABLED, "true", "晚自习打卡提醒开关", SiteConfig.ConfigType.BOOLEAN);
         resetConfigToDefault(SiteConfig.Keys.MAIL_LEAVE_APPROVAL_REMINDER_ENABLED, "true", "请假审批提醒开关", SiteConfig.ConfigType.BOOLEAN);
         resetConfigToDefault(SiteConfig.Keys.MAIL_BORROW_OVERDUE_REMINDER_ENABLED, "true", "设备逾期归还提醒开关", SiteConfig.ConfigType.BOOLEAN);
+        resetConfigToDefault(SiteConfig.Keys.JOIN_INTERVIEW_QQ_GROUP, "", "入部面试QQ群号", SiteConfig.ConfigType.TEXT);
     }
 
     private String resolveConfigValueForSave(SiteConfigRequest request, SiteConfig existingConfig) {

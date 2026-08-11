@@ -7,7 +7,6 @@ import com.example.photography.model.entity.User;
 import com.example.photography.repository.DepartmentRepository;
 import com.example.photography.repository.UserRepository;
 import com.example.photography.service.DepartmentService;
-import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,12 +32,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     
     @Autowired
     private UserRepository userRepository;
-    
-    @PostConstruct
-    public void init() {
-        initializeDefaultDepartments();
-    }
-    
+
     @Override
     public Department createDepartment(DepartmentCreateRequest request) {
         // 检查部门名称是否存在

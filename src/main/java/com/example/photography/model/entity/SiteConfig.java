@@ -200,6 +200,11 @@ public class SiteConfig extends BaseEntity {
          */
         public static final String MAIL_BORROW_OVERDUE_REMINDER_ENABLED = "mail.borrow_overdue_reminder_enabled";
 
+        /**
+         * 入部申请通过后通知的面试QQ群号
+         */
+        public static final String JOIN_INTERVIEW_QQ_GROUP = "join.interview_qq_group";
+
         public static final String LANDING_HERO_TITLE = "landing.hero.title";
         public static final String LANDING_HERO_SUBTITLE = "landing.hero.subtitle";
         public static final String LANDING_HERO_MEDIA = "landing.hero.media";

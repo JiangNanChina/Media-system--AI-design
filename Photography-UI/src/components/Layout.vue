@@ -41,7 +41,6 @@
             :default-active="$route.path"
             :collapse="isCollapse && !isMobile"
             :unique-opened="true"
-            router
             background-color="transparent"
             text-color="#b8c5d1"
             active-text-color="#ffffff"
@@ -361,7 +360,8 @@ const menuItems = [
     path: '/department',
     meta: { title: '部门管理', icon: 'OfficeBuilding', roles: ['DIRECTOR', 'SUPER_ADMIN', 'ADMIN'] },
     children: [
-      { path: '/department/list', meta: { title: '部门列表', icon: 'Management' } }
+      { path: '/department/list', meta: { title: '部门列表', icon: 'Management' } },
+      { path: '/department/colleges', meta: { title: '学院管理', icon: 'School' } }
     ]
   },
   {
@@ -426,6 +426,10 @@ const menuItems = [
   {
     path: '/submission-management',
     meta: { title: '投稿管理', icon: 'VideoCamera', roles: ['MINISTER', 'DIRECTOR', 'SUPER_ADMIN', 'ADMIN'] }
+  },
+  {
+    path: '/join-applications',
+    meta: { title: '入部申请', icon: 'UserFilled', roles: ['MINISTER', 'DIRECTOR', 'SUPER_ADMIN', 'ADMIN'] }
   }
 ]
 
@@ -504,7 +508,16 @@ const closeMobileSidebar = () => {
 }
 
 // 处理菜单选择（移动端自动收起）
-const handleMenuSelect = () => {
+const handleMenuSelect = async (index) => {
+  if (index && index !== route.path) {
+    try {
+      await router.push(index)
+    } catch (error) {
+      console.error('菜单跳转失败:', error)
+      ElMessage.error('页面跳转失败，请稍后重试')
+    }
+  }
+
   if (isMobile.value) {
     // 延迟收起，确保路由跳转完成
     setTimeout(() => {

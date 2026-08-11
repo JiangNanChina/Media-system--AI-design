@@ -7,9 +7,9 @@
     
     <!-- 搜索和操作栏 -->
     <el-card class="search-card">
-      <!-- 搜索条件 -->
-      <el-row :gutter="16" class="search-row">
-        <el-col :xs="24" :sm="12" :md="8" :lg="6">
+      <div class="toolbar-layout">
+        <!-- 搜索条件 -->
+        <div class="filter-group">
           <el-input
             v-model="searchForm.keyword"
             placeholder="搜索设备名称/序列号"
@@ -20,14 +20,11 @@
               <el-icon><Search /></el-icon>
             </template>
           </el-input>
-        </el-col>
-        
-        <el-col :xs="24" :sm="12" :md="8" :lg="6">
+
           <el-select 
             v-model="searchForm.category" 
             placeholder="选择分类" 
             clearable
-            style="width: 100%"
           >
             <el-option
               v-for="category in categories"
@@ -36,9 +33,7 @@
               :value="category"
             />
           </el-select>
-        </el-col>
-        
-        <el-col :xs="24" :sm="24" :md="8" :lg="12">
+
           <div class="basic-actions">
             <el-button type="primary" @click="handleSearch" :loading="loading">
               <el-icon><Search /></el-icon>
@@ -49,45 +44,41 @@
               <span v-if="!isMobile">重置</span>
             </el-button>
           </div>
-        </el-col>
-      </el-row>
-      
-      <!-- 管理员操作按钮 -->
-      <el-row v-if="userStore.isAdmin" :gutter="16" class="admin-actions-row">
-        <el-col :span="24">
-          <div class="admin-actions">
-            <el-button 
-              type="success" 
-              @click="showCreateDialog = true"
-            >
-              <el-icon><Plus /></el-icon>
-              <span>新增设备</span>
-            </el-button>
-            <el-button 
-              type="warning" 
-              @click="handleCategoryManagement"
-            >
-              <el-icon><Setting /></el-icon>
-              <span>分类管理</span>
-            </el-button>
-            <el-button 
-              type="info" 
-              @click="handleExportEquipment"
-            >
-              <el-icon><Download /></el-icon>
-              <span>导出Excel</span>
-            </el-button>
-            <el-button 
-              type="danger" 
-              plain
-              @click="showCleanupDialog = true"
-            >
-              <el-icon><Delete /></el-icon>
-              <span>数据清理</span>
-            </el-button>
-          </div>
-        </el-col>
-      </el-row>
+        </div>
+
+        <!-- 管理员操作按钮 -->
+        <div v-if="userStore.isAdmin" class="admin-actions">
+          <el-button
+            type="success"
+            @click="showCreateDialog = true"
+          >
+            <el-icon><Plus /></el-icon>
+            <span>新增设备</span>
+          </el-button>
+          <el-button
+            type="warning"
+            @click="handleCategoryManagement"
+          >
+            <el-icon><Setting /></el-icon>
+            <span>分类管理</span>
+          </el-button>
+          <el-button
+            type="info"
+            @click="handleExportEquipment"
+          >
+            <el-icon><Download /></el-icon>
+            <span>导出Excel</span>
+          </el-button>
+          <el-button
+            type="danger"
+            plain
+            @click="showCleanupDialog = true"
+          >
+            <el-icon><Delete /></el-icon>
+            <span>数据清理</span>
+          </el-button>
+        </div>
+      </div>
     </el-card>
     
     <!-- 设备列表 -->
@@ -2210,23 +2201,50 @@ onUnmounted(() => {
 .search-card,
 .table-card {
   background: var(--color-white);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-lg);
+  border-radius: 18px;
+  box-shadow: 0 14px 36px rgba(18, 85, 116, 0.08);
   margin-bottom: var(--spacing-5);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(98, 177, 210, 0.16);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  transition: all var(--duration-normal) var(--easing-ease);
+  transition: border-color var(--duration-fast) var(--easing-ease), box-shadow var(--duration-fast) var(--easing-ease);
 }
 
 .search-card:hover,
 .table-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-xl);
+  border-color: rgba(24, 185, 236, 0.24);
+  box-shadow: 0 18px 44px rgba(18, 85, 116, 0.1);
 }
 
-.search-row {
-  align-items: flex-end;
+.search-card :deep(.el-card__body) {
+  padding: 18px 20px;
+}
+
+.table-card :deep(.el-card__header) {
+  padding: 18px 20px;
+  border-bottom: 1px solid rgba(98, 177, 210, 0.14);
+}
+
+.table-card :deep(.el-card__body) {
+  padding: 0 20px 18px;
+}
+
+.toolbar-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.filter-group {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.1fr) minmax(220px, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.filter-group :deep(.el-input),
+.filter-group :deep(.el-select) {
+  width: 100%;
 }
 
 /* 基础搜索操作 */
@@ -2234,6 +2252,12 @@ onUnmounted(() => {
   display: flex;
   gap: 8px;
   justify-content: flex-start;
+  white-space: nowrap;
+}
+
+.basic-actions .el-button + .el-button,
+.admin-actions .el-button + .el-button {
+  margin-left: 0;
 }
 
 /* 管理员操作行 */
@@ -2245,9 +2269,9 @@ onUnmounted(() => {
 
 .admin-actions {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-end;
   align-items: center;
 }
 
@@ -2274,6 +2298,11 @@ onUnmounted(() => {
 
 /* 中等屏幕优化 */
 @media (max-width: 1024px) and (min-width: 769px) {
+  .filter-group {
+    grid-template-columns: minmax(220px, 1fr) minmax(190px, 0.8fr) auto;
+    gap: 12px;
+  }
+
   .admin-actions {
     gap: 10px;
   }
@@ -2692,14 +2721,24 @@ onUnmounted(() => {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .basic-actions {
-    flex-direction: column;
-    width: 100%;
+  .toolbar-layout {
     gap: 12px;
+  }
+
+  .filter-group {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .basic-actions {
+    flex-direction: row;
+    width: 100%;
+    gap: 10px;
   }
   
   .basic-actions .el-button {
-    width: 100%;
+    flex: 1 1 0;
+    width: auto;
     justify-content: center;
   }
   
@@ -2709,7 +2748,8 @@ onUnmounted(() => {
   }
   
   .admin-actions {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
     justify-content: stretch;
   }
@@ -2717,6 +2757,7 @@ onUnmounted(() => {
   .admin-actions .el-button {
     width: 100%;
     min-width: auto;
+    margin-left: 0;
     height: 40px;
     font-size: 14px;
     justify-content: center;
@@ -3408,17 +3449,30 @@ onUnmounted(() => {
 
 /* 移动端卡片视图 */
 .mobile-cards {
-  display: none;
-}
-
-.equipment-management .desktop-table {
   display: none !important;
 }
 
+.equipment-management .desktop-table {
+  display: block !important;
+}
+
 .equipment-management .mobile-cards {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(320px, 1fr));
-  gap: 22px;
+  display: none !important;
+}
+
+.desktop-table :deep(.el-table__empty-block) {
+  min-height: 360px;
+  width: 100% !important;
+}
+
+.desktop-table :deep(.el-table__empty-text) {
+  width: 100%;
+  line-height: normal;
+}
+
+.equipment-management .mobile-cards > .empty-state {
+  grid-column: 1 / -1;
+  min-height: 320px;
 }
 
 .equipment-card {
@@ -3624,7 +3678,11 @@ onUnmounted(() => {
     font-weight: 500;
   }
   
-  .mobile-cards {
+  .equipment-management .desktop-table {
+    display: none !important;
+  }
+
+  .equipment-management .mobile-cards {
     display: grid !important;
     grid-template-columns: 1fr;
     gap: 14px;
