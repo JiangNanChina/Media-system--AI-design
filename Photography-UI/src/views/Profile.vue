@@ -363,7 +363,7 @@
           </div>
         </el-upload>
         <div class="upload-tips">
-          <p>支持 JPG、PNG 格式，文件大小不超过 2MB</p>
+          <p>支持 JPG、PNG 格式，文件大小不超过 10MB</p>
           <p>建议上传正方形图片，获得最佳显示效果</p>
         </div>
       </div>
@@ -389,6 +389,7 @@ import {
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import request from '@/utils/request'
+import { getUploadedImageUrl } from '@/utils/imageUrl'
 
 const userStore = useUserStore()
 
@@ -399,15 +400,7 @@ const isMobile = computed(() => windowWidth.value <= 768)
 
 // 头像URL计算属性
 const avatarUrl = computed(() => {
-  if (!userInfo.value.avatar) return ''
-  
-  // 如果是完整URL，直接返回
-  if (userInfo.value.avatar.startsWith('http')) {
-    return userInfo.value.avatar
-  }
-  
-  // 如果是相对路径，直接返回（不添加API前缀，因为静态资源直接访问）
-  return userInfo.value.avatar
+  return getUploadedImageUrl(userInfo.value.avatar)
 })
 const showEditDialog = ref(false)
 const showPasswordDialog = ref(false)
@@ -802,14 +795,14 @@ const handleChangePassword = async () => {
 // 头像上传前检查
 const beforeAvatarUpload = (file) => {
   const isImage = file.type.startsWith('image/')
-  const isLt2M = file.size / 1024 / 1024 < 2
+  const isLt10M = file.size / 1024 / 1024 <= 10
   
   if (!isImage) {
     ElMessage.error('只能上传图片文件')
     return false
   }
-  if (!isLt2M) {
-    ElMessage.error('图片大小不能超过 2MB')
+  if (!isLt10M) {
+    ElMessage.error('图片大小不能超过 10MB')
     return false
   }
   

@@ -47,10 +47,11 @@ VALUES
 ('mail.sender_name', '融媒体管理系统', '邮件发件人名称', 'TEXT', 1, 1006, 0, NOW(), NOW()),
 ('mail.reminder_advance_minutes', '30', '执勤和晚自习提醒提前分钟数', 'NUMBER', 1, 1007, 0, NOW(), NOW()),
 ('mail.overdue_reminder_interval_hours', '24', '设备逾期归还提醒间隔小时数', 'NUMBER', 1, 1008, 0, NOW(), NOW()),
-('mail.duty_reminder_enabled', 'true', '执勤提醒开关', 'BOOLEAN', 1, 1009, 0, NOW(), NOW()),
-('mail.checkin_reminder_enabled', 'true', '晚自习打卡提醒开关', 'BOOLEAN', 1, 1010, 0, NOW(), NOW()),
-('mail.leave_approval_reminder_enabled', 'true', '请假审批提醒开关', 'BOOLEAN', 1, 1011, 0, NOW(), NOW()),
-('mail.borrow_overdue_reminder_enabled', 'true', '设备逾期归还提醒开关', 'BOOLEAN', 1, 1012, 0, NOW(), NOW())
+('mail.log_retention_days', '30', '邮件发送日志与验证码记录保留天数', 'NUMBER', 1, 1009, 0, NOW(), NOW()),
+('mail.duty_reminder_enabled', 'true', '执勤提醒开关', 'BOOLEAN', 1, 1010, 0, NOW(), NOW()),
+('mail.checkin_reminder_enabled', 'true', '晚自习打卡提醒开关', 'BOOLEAN', 1, 1011, 0, NOW(), NOW()),
+('mail.leave_approval_reminder_enabled', 'true', '请假审批提醒开关', 'BOOLEAN', 1, 1012, 0, NOW(), NOW()),
+('mail.borrow_overdue_reminder_enabled', 'true', '设备逾期归还提醒开关', 'BOOLEAN', 1, 1013, 0, NOW(), NOW())
 ON DUPLICATE KEY UPDATE
 description = VALUES(description),
 config_type = VALUES(config_type),

@@ -4,9 +4,12 @@ import com.example.photography.model.entity.EmailNotificationLog;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import java.time.LocalDateTime;
 
 /**
  * 邮件通知日志Repository
@@ -33,4 +36,8 @@ public interface EmailNotificationLogRepository extends JpaRepository<EmailNotif
     Page<EmailNotificationLog> searchLogs(@Param("notificationType") String notificationType,
                                           @Param("success") Boolean success,
                                           Pageable pageable);
+
+    @Modifying
+    @Query("DELETE FROM EmailNotificationLog l WHERE l.sentAt < :cutoff")
+    int deleteBySentAtBefore(@Param("cutoff") LocalDateTime cutoff);
 }

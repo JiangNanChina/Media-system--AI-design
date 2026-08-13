@@ -5,14 +5,18 @@
       <span>返回首页</span>
     </router-link>
 
-    <div class="auth-form">
+    <div class="auth-form" :class="authFormClasses">
       <div class="auth-header">
-        <h2 class="auth-title animate-title">
-          {{ isLoginMode ? (siteConfig.loginTitle || siteConfig.siteTitle || '融媒体管理系统') : '用户注册' }}
-        </h2>
-        <p class="auth-subtitle animate-subtitle">
-          {{ isLoginMode ? (siteConfig.loginWelcome || '欢迎回来，请登录您的账户') : '创建您的融媒体管理系统账户' }}
-        </p>
+        <transition name="brand-fade">
+          <div :key="isLoginMode ? 'login-brand' : 'register-brand'" class="auth-brand-copy">
+            <h2 class="auth-title animate-title">
+              {{ isLoginMode ? (siteConfig.loginTitle || siteConfig.siteTitle || '融媒体管理系统') : '用户注册' }}
+            </h2>
+            <p class="auth-subtitle animate-subtitle">
+              {{ isLoginMode ? (siteConfig.loginWelcome || '欢迎回来，请登录您的账户') : '创建您的融媒体管理系统账户' }}
+            </p>
+          </div>
+        </transition>
         <!-- 动态LOGO -->
         <div v-if="siteConfig.siteLogo" class="logo-container animate-logo">
           <img :src="siteConfig.siteLogo" :alt="siteConfig.siteTitle || '网站LOGO'" class="site-logo" />
@@ -42,10 +46,11 @@
       
       <!-- 表单切换容器 -->
       <div class="form-container">
-        <transition name="form-slide" mode="out-in">
+        <transition :name="formTransitionName" @after-enter="handleAuthTransitionEnd">
           <!-- 登录表单 -->
       <el-form
             v-if="isLoginMode"
+        key="login-form"
         ref="loginFormRef"
         :model="loginForm"
         :rules="loginRules"
@@ -105,6 +110,7 @@
           <!-- 注册表单 -->
           <el-form
             v-else
+            key="register-form"
             ref="registerFormRef"
             :model="registerForm"
             :rules="registerRules"
@@ -367,6 +373,18 @@ const userStore = useUserStore()
 
 // 模式切换状态
 const isLoginMode = ref(true)
+const transitionDirection = ref('forward')
+const isModeSwitching = ref(false)
+
+const authFormClasses = computed(() => ({
+  'auth-form-login': isLoginMode.value,
+  'auth-form-register': !isLoginMode.value,
+  'auth-form-switching': isModeSwitching.value
+}))
+
+const formTransitionName = computed(() => (
+  transitionDirection.value === 'backward' ? 'auth-panel-backward' : 'auth-panel-forward'
+))
 
 // 登录和注册状态
 const loading = ref(false)
@@ -781,8 +799,29 @@ const handleLoginUsernameInput = (value) => {
 }
 
 // 模式切换方法
+const setAuthMode = (nextMode) => {
+  const nextIsLoginMode = nextMode === 'login'
+
+  if (isLoginMode.value === nextIsLoginMode) {
+    return false
+  }
+
+  transitionDirection.value = nextIsLoginMode ? 'backward' : 'forward'
+  isModeSwitching.value = true
+  isLoginMode.value = nextIsLoginMode
+  return true
+}
+
+const handleAuthTransitionEnd = () => {
+  isModeSwitching.value = false
+}
+
 const switchToLogin = () => {
-  isLoginMode.value = true
+  const didSwitch = setAuthMode('login')
+
+  if (!didSwitch) {
+    return
+  }
   
   // 清空登录表单数据
   loginForm.username = ''
@@ -796,7 +835,11 @@ const switchToLogin = () => {
 }
 
 const switchToRegister = () => {
-  isLoginMode.value = false
+  const didSwitch = setAuthMode('register')
+
+  if (!didSwitch) {
+    return
+  }
   
   // 清空注册表单数据
   registerForm.username = ''
@@ -3227,11 +3270,11 @@ onUnmounted(() => {
 
 :global(#app .auth-form) {
   display: grid !important;
-  grid-template-columns: minmax(300px, 0.92fr) minmax(420px, 1.08fr) !important;
+  grid-template-columns: minmax(360px, 0.96fr) minmax(420px, 1.04fr) !important;
   grid-template-rows: auto 1fr !important;
   align-items: stretch !important;
   gap: clamp(20px, 3vw, 30px) !important;
-  width: min(100%, 1060px) !important;
+  width: min(100%, 1120px) !important;
   max-width: none !important;
   max-height: none !important;
   overflow: visible !important;
@@ -3242,8 +3285,15 @@ onUnmounted(() => {
   box-shadow: 0 34px 90px rgba(18, 85, 116, 0.14) !important;
   backdrop-filter: blur(28px) saturate(1.12) !important;
   -webkit-backdrop-filter: blur(28px) saturate(1.12) !important;
+  transition:
+    width 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    grid-template-columns 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 260ms ease,
+    background-color 260ms ease !important;
+  will-change: width, grid-template-columns !important;
 }
 
+:global(#app .auth-form-register),
 :global(#app .auth-form:has(.register-form)) {
   grid-template-columns: minmax(300px, 0.88fr) minmax(590px, 1.12fr) !important;
   width: min(100%, 1120px) !important;
@@ -3260,10 +3310,10 @@ onUnmounted(() => {
   display: flex !important;
   flex-direction: column !important;
   align-items: flex-start !important;
-  justify-content: space-between !important;
+  justify-content: flex-start !important;
   min-height: 430px !important;
   margin: 0 !important;
-  padding: clamp(28px, 3.2vw, 38px) !important;
+  padding: clamp(30px, 3.2vw, 40px) !important;
   text-align: left !important;
   overflow: hidden !important;
   background:
@@ -3273,6 +3323,9 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.9) !important;
   border-radius: 24px !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92), 0 18px 44px rgba(18, 174, 231, 0.1) !important;
+  transition:
+    min-height 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 360ms cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
 :global(#app .auth-header::before) {
@@ -3282,7 +3335,7 @@ onUnmounted(() => {
   order: -1 !important;
   width: 86px !important;
   height: 5px !important;
-  margin: 0 0 clamp(28px, 5vw, 54px) !important;
+  margin: 0 0 42px !important;
   border-radius: 999px !important;
   background: linear-gradient(90deg, #25b8f2, #62d6bd, #ffd26f) !important;
 }
@@ -3309,18 +3362,30 @@ onUnmounted(() => {
   display: none !important;
 }
 
+:global(#app .auth-brand-copy) {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  position: relative !important;
+  transform-origin: left center !important;
+}
+
 :global(#app .auth-title) {
-  max-width: 360px !important;
-  margin: 0 0 16px !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 0 14px !important;
   color: #12384f !important;
-  font-size: clamp(32px, 4vw, 44px) !important;
-  line-height: 1.12 !important;
+  font-size: 38px !important;
+  line-height: 1.16 !important;
   letter-spacing: 0 !important;
+  word-break: keep-all !important;
+  overflow-wrap: normal !important;
+  text-wrap: balance !important;
   text-shadow: none !important;
 }
 
 :global(#app .auth-subtitle) {
-  max-width: 340px !important;
+  max-width: 100% !important;
   margin: 0 !important;
   color: #4f6d82 !important;
   font-size: 15px !important;
@@ -3330,10 +3395,10 @@ onUnmounted(() => {
 
 :global(#app .logo-container) {
   order: 4 !important;
-  width: min(100%, 220px) !important;
-  height: 132px !important;
+  width: 112px !important;
+  height: 112px !important;
   margin: auto 0 0 !important;
-  border-radius: 24px !important;
+  border-radius: 999px !important;
 }
 
 :global(#app .site-logo) {
@@ -3341,6 +3406,34 @@ onUnmounted(() => {
   height: 100% !important;
   object-fit: cover !important;
   border-radius: inherit !important;
+}
+
+:global(#app .auth-header .logo-container) {
+  display: grid !important;
+  place-items: center !important;
+  flex: 0 0 auto !important;
+  width: 112px !important;
+  height: 112px !important;
+  box-sizing: border-box !important;
+  padding: 6px !important;
+  overflow: hidden !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.86) !important;
+  border: 1px solid rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 18px 34px rgba(18, 85, 116, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+  transition:
+    width 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 260ms ease !important;
+}
+
+:global(#app .auth-header .site-logo) {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  object-fit: cover !important;
+  border-radius: 999px !important;
 }
 
 :global(#app .mode-tabs) {
@@ -3355,6 +3448,10 @@ onUnmounted(() => {
   border: 1px solid rgba(98, 177, 210, 0.24) !important;
   border-radius: 999px !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 12px 26px rgba(18, 174, 231, 0.08) !important;
+  transition:
+    width 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms ease,
+    border-color 220ms ease !important;
 }
 
 :global(#app .mode-tab) {
@@ -3363,12 +3460,16 @@ onUnmounted(() => {
   font-size: 15px !important;
   font-weight: 800 !important;
   border-radius: 999px !important;
-  transition: color 180ms ease, background 180ms ease !important;
+  transition:
+    color 220ms ease,
+    background 220ms ease,
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
 
 :global(#app .mode-tab.active) {
   color: #075985 !important;
   text-shadow: none !important;
+  transform: translateY(-1px) !important;
 }
 
 :global(#app .tab-indicator) {
@@ -3379,6 +3480,11 @@ onUnmounted(() => {
   border: 1px solid rgba(37, 184, 242, 0.24) !important;
   border-radius: 999px !important;
   box-shadow: 0 10px 22px rgba(18, 174, 231, 0.12) !important;
+  transition:
+    transform 440ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms ease,
+    background 220ms ease !important;
+  will-change: transform !important;
 }
 
 :global(#app .tab-indicator.move-right) {
@@ -3396,11 +3502,118 @@ onUnmounted(() => {
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
+  position: relative !important;
+  contain: layout paint !important;
+  transition:
+    padding 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 260ms ease,
+    border-color 260ms ease,
+    box-shadow 260ms ease !important;
 }
 
 :global(#app .auth-form-content) {
   width: min(100%, 540px) !important;
   margin: 0 auto !important;
+  transform-origin: center top !important;
+  will-change: transform, opacity !important;
+}
+
+:global(#app .form-slide-enter-active),
+:global(#app .form-slide-leave-active),
+:global(#app .form-slide-back-enter-active),
+:global(#app .form-slide-back-leave-active),
+:global(#app .auth-panel-forward-enter-active),
+:global(#app .auth-panel-forward-leave-active),
+:global(#app .auth-panel-backward-enter-active),
+:global(#app .auth-panel-backward-leave-active) {
+  transition:
+    opacity 520ms ease,
+    transform 560ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 480ms ease !important;
+}
+
+:global(#app .form-slide-leave-active),
+:global(#app .form-slide-back-leave-active),
+:global(#app .auth-panel-forward-leave-active),
+:global(#app .auth-panel-backward-leave-active) {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  pointer-events: none !important;
+}
+
+:global(#app .form-slide-enter-from) {
+  opacity: 0 !important;
+  filter: blur(4px) !important;
+  transform: translateX(34px) scale(0.985) !important;
+}
+
+:global(#app .auth-panel-forward-enter-from) {
+  opacity: 0 !important;
+  filter: blur(6px) !important;
+  transform: translateX(56px) scale(0.98) !important;
+}
+
+:global(#app .form-slide-leave-to) {
+  opacity: 0 !important;
+  filter: blur(4px) !important;
+  transform: translateX(-34px) scale(0.985) !important;
+}
+
+:global(#app .auth-panel-forward-leave-to) {
+  opacity: 0 !important;
+  filter: blur(6px) !important;
+  transform: translateX(-56px) scale(0.98) !important;
+}
+
+:global(#app .form-slide-back-enter-from) {
+  opacity: 0 !important;
+  filter: blur(4px) !important;
+  transform: translateX(-34px) scale(0.985) !important;
+}
+
+:global(#app .auth-panel-backward-enter-from) {
+  opacity: 0 !important;
+  filter: blur(6px) !important;
+  transform: translateX(-56px) scale(0.98) !important;
+}
+
+:global(#app .form-slide-back-leave-to) {
+  opacity: 0 !important;
+  filter: blur(4px) !important;
+  transform: translateX(34px) scale(0.985) !important;
+}
+
+:global(#app .auth-panel-backward-leave-to) {
+  opacity: 0 !important;
+  filter: blur(6px) !important;
+  transform: translateX(56px) scale(0.98) !important;
+}
+
+:global(#app .brand-fade-enter-active),
+:global(#app .brand-fade-leave-active) {
+  transition:
+    opacity 260ms ease,
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 260ms ease !important;
+}
+
+:global(#app .brand-fade-leave-active) {
+  position: absolute !important;
+  left: 0 !important;
+  right: 0 !important;
+}
+
+:global(#app .brand-fade-enter-from),
+:global(#app .brand-fade-leave-to) {
+  opacity: 0 !important;
+  filter: blur(3px) !important;
+  transform: translateY(10px) !important;
+}
+
+:global(#app .auth-form-switching .auth-header .logo-container) {
+  transform: translateY(-4px) !important;
+  box-shadow: 0 22px 38px rgba(18, 85, 116, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
 }
 
 :global(#app .auth-form-content .el-form-item) {
@@ -3448,19 +3661,23 @@ onUnmounted(() => {
   box-shadow: 0 18px 38px rgba(18, 174, 231, 0.18) !important;
 }
 
+:global(#app .auth-form-register .auth-header),
 :global(#app .auth-form:has(.register-form) .auth-header) {
   min-height: 430px !important;
 }
 
+:global(#app .auth-form-register .form-container),
 :global(#app .auth-form:has(.register-form) .form-container) {
   align-self: center !important;
 }
 
+:global(#app .auth-form-register .auth-form-content),
 :global(#app .auth-form:has(.register-form) .auth-form-content) {
   width: 100% !important;
   max-width: none !important;
 }
 
+:global(#app .auth-form-register .register-form),
 :global(#app .auth-form:has(.register-form) .register-form) {
   display: grid !important;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -3477,12 +3694,14 @@ onUnmounted(() => {
   -webkit-backdrop-filter: none !important;
 }
 
+:global(#app .auth-form-register .register-form .el-row),
 :global(#app .auth-form:has(.register-form) .register-form .el-row) {
   display: contents !important;
   margin-left: 0 !important;
   margin-right: 0 !important;
 }
 
+:global(#app .auth-form-register .register-form .el-col),
 :global(#app .auth-form:has(.register-form) .register-form .el-col) {
   display: block !important;
   width: auto !important;
@@ -3492,19 +3711,41 @@ onUnmounted(() => {
   padding-right: 0 !important;
 }
 
+:global(#app .auth-form-register .register-form .el-form-item),
 :global(#app .auth-form:has(.register-form) .register-form .el-form-item) {
   margin-bottom: 14px !important;
 }
 
+:global(#app .auth-form-register .register-form .el-input__wrapper),
+:global(#app .auth-form-register .register-form .el-select .el-input__wrapper),
 :global(#app .auth-form:has(.register-form) .register-form .el-input__wrapper),
 :global(#app .auth-form:has(.register-form) .register-form .el-select .el-input__wrapper) {
   min-height: 46px !important;
   height: 46px !important;
 }
 
+:global(#app .auth-form-register .register-form .full-width-item),
+:global(#app .auth-form-register .register-form .button-item),
 :global(#app .auth-form:has(.register-form) .register-form .full-width-item),
 :global(#app .auth-form:has(.register-form) .register-form .button-item) {
   grid-column: 1 / -1 !important;
+}
+
+:global(#app .auth-form-login) {
+  grid-template-columns: minmax(360px, 0.96fr) minmax(420px, 1.04fr) !important;
+}
+
+:global(#app .auth-form-login .form-container) {
+  align-self: center !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+:global(#app .auth-form-login .auth-form-content:not(.register-form)) {
+  width: min(100%, 540px) !important;
+  max-width: 540px !important;
 }
 
 :global(#app .email-code-control) {
@@ -3541,6 +3782,7 @@ onUnmounted(() => {
 
 @media (max-width: 980px) {
   :global(#app .auth-form),
+  :global(#app .auth-form-register),
   :global(#app .auth-form:has(.register-form)) {
     grid-template-columns: 1fr !important;
     grid-template-rows: auto auto auto !important;
@@ -3548,6 +3790,7 @@ onUnmounted(() => {
   }
 
   :global(#app .auth-header),
+  :global(#app .auth-form-register .auth-header),
   :global(#app .auth-form:has(.register-form) .auth-header) {
     grid-column: 1 !important;
     grid-row: 1 !important;
@@ -3577,6 +3820,36 @@ onUnmounted(() => {
     padding-top: 72px !important;
   }
 
+  :global(#app .auth-header),
+  :global(#app .auth-form-register .auth-header),
+  :global(#app .auth-form:has(.register-form) .auth-header) {
+    padding: 28px 30px 30px !important;
+  }
+
+  :global(#app .auth-header::before) {
+    margin-bottom: 30px !important;
+  }
+
+  :global(#app .auth-title) {
+    font-size: 28px !important;
+    line-height: 1.24 !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+    text-wrap: auto !important;
+  }
+
+  :global(#app .auth-subtitle) {
+    font-size: 14px !important;
+    line-height: 1.55 !important;
+  }
+
+  :global(#app .auth-header .logo-container) {
+    width: 96px !important;
+    height: 96px !important;
+    margin-top: 28px !important;
+  }
+
+  :global(#app .auth-form-register .register-form),
   :global(#app .auth-form:has(.register-form) .register-form) {
     grid-template-columns: 1fr !important;
   }
@@ -3592,6 +3865,55 @@ onUnmounted(() => {
   :global(#app .password-strength) {
     grid-template-columns: 1fr !important;
     align-items: start !important;
+  }
+}
+
+@media (max-width: 360px) {
+  :global(#app .auth-header),
+  :global(#app .auth-form-register .auth-header),
+  :global(#app .auth-form:has(.register-form) .auth-header) {
+    padding: 24px 24px 28px !important;
+  }
+
+  :global(#app .auth-title) {
+    font-size: 26px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global(#app .auth-form),
+  :global(#app .auth-header),
+  :global(#app .auth-header .logo-container),
+  :global(#app .mode-tabs),
+  :global(#app .mode-tab),
+  :global(#app .tab-indicator),
+  :global(#app .form-container),
+  :global(#app .form-slide-enter-active),
+  :global(#app .form-slide-leave-active),
+  :global(#app .form-slide-back-enter-active),
+  :global(#app .form-slide-back-leave-active),
+  :global(#app .auth-panel-forward-enter-active),
+  :global(#app .auth-panel-forward-leave-active),
+  :global(#app .auth-panel-backward-enter-active),
+  :global(#app .auth-panel-backward-leave-active),
+  :global(#app .brand-fade-enter-active),
+  :global(#app .brand-fade-leave-active) {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+
+  :global(#app .form-slide-enter-from),
+  :global(#app .form-slide-leave-to),
+  :global(#app .form-slide-back-enter-from),
+  :global(#app .form-slide-back-leave-to),
+  :global(#app .auth-panel-forward-enter-from),
+  :global(#app .auth-panel-forward-leave-to),
+  :global(#app .auth-panel-backward-enter-from),
+  :global(#app .auth-panel-backward-leave-to),
+  :global(#app .brand-fade-enter-from),
+  :global(#app .brand-fade-leave-to) {
+    filter: none !important;
+    transform: none !important;
   }
 }
 </style>

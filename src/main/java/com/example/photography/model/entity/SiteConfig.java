@@ -181,6 +181,11 @@ public class SiteConfig extends BaseEntity {
         public static final String MAIL_OVERDUE_REMINDER_INTERVAL_HOURS = "mail.overdue_reminder_interval_hours";
 
         /**
+         * 邮件日志与验证码记录保留天数
+         */
+        public static final String MAIL_LOG_RETENTION_DAYS = "mail.log_retention_days";
+
+        /**
          * 执勤提醒开关
          */
         public static final String MAIL_DUTY_REMINDER_ENABLED = "mail.duty_reminder_enabled";

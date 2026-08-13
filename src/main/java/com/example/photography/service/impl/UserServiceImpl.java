@@ -1,6 +1,5 @@
 package com.example.photography.service.impl;
 
-import com.example.photography.config.FileUploadConfig;
 import com.example.photography.dto.request.UserCreateRequest;
 import com.example.photography.dto.request.UserUpdateRequest;
 import com.example.photography.model.entity.Department;
@@ -34,6 +33,7 @@ import java.util.UUID;
 @Service
 @Transactional
 public class UserServiceImpl implements UserService {
+    private static final long AVATAR_MAX_FILE_SIZE = 10L * 1024 * 1024;
     
     @Autowired
     private UserRepository userRepository;
@@ -66,7 +66,7 @@ public class UserServiceImpl implements UserService {
     private RefreshTokenService refreshTokenService;
     
     @Autowired
-    private FileUploadConfig fileUploadConfig;
+    private FileUploadUtil fileUploadUtil;
     
     @Override
     @Transactional(readOnly = true)
@@ -299,7 +299,6 @@ public class UserServiceImpl implements UserService {
         // 7. 删除用户头像文件（如果存在）
         if (user.getAvatarUrl() != null && !user.getAvatarUrl().isEmpty()) {
             try {
-                FileUploadUtil fileUploadUtil = new FileUploadUtil();
                 fileUploadUtil.deleteFile(user.getAvatarUrl());
                 System.out.println("已删除用户头像文件: " + user.getAvatarUrl());
             } catch (Exception e) {
@@ -414,9 +413,7 @@ public class UserServiceImpl implements UserService {
     public String uploadAvatar(Long userId, MultipartFile file) {
         User user = findById(userId);
         
-        // 使用统一的文件上传工具
-        FileUploadUtil fileUploadUtil = new FileUploadUtil();
-        String avatarUrl = fileUploadUtil.uploadFile(file, "avatars");
+        String avatarUrl = fileUploadUtil.uploadFile(file, "avatars", AVATAR_MAX_FILE_SIZE, true);
         
         // 更新用户头像URL
         user.setAvatarUrl(avatarUrl);

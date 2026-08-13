@@ -368,6 +368,7 @@ import {
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import request from '@/utils/request'
+import { getUploadedImageUrl } from '@/utils/imageUrl'
 
 const userStore = useUserStore()
 const roleOptions = [
@@ -408,15 +409,7 @@ const usernameFormatErrorUserForm = ref('')
 
 // 头像URL处理函数
 const getAvatarUrl = (avatarUrl) => {
-  if (!avatarUrl) return ''
-  
-  // 如果是完整URL，直接返回
-  if (avatarUrl.startsWith('http')) {
-    return avatarUrl
-  }
-  
-  // 如果是相对路径，直接返回（不添加/api前缀，因为静态资源直接访问）
-  return avatarUrl
+  return getUploadedImageUrl(avatarUrl)
 }
 
 // 搜索表单

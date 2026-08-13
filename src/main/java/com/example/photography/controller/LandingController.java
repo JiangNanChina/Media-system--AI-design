@@ -62,4 +62,11 @@ public class LandingController {
     public ApiResponse<String> uploadMedia(@RequestPart MultipartFile file) {
         return ApiResponse.success("媒体上传成功", landingService.uploadMedia(file));
     }
+
+    @DeleteMapping("/admin/media")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ApiResponse<Void> deleteMedia(@RequestParam String mediaUrl) {
+        landingService.deleteUnreferencedMedia(mediaUrl);
+        return ApiResponse.success("未引用媒体已清理");
+    }
 }

@@ -277,6 +277,7 @@ public class SiteConfigServiceImpl implements SiteConfigService {
                 SiteConfig.Keys.MAIL_SENDER_NAME,
                 SiteConfig.Keys.MAIL_REMINDER_ADVANCE_MINUTES,
                 SiteConfig.Keys.MAIL_OVERDUE_REMINDER_INTERVAL_HOURS,
+                SiteConfig.Keys.MAIL_LOG_RETENTION_DAYS,
                 SiteConfig.Keys.MAIL_DUTY_REMINDER_ENABLED,
                 SiteConfig.Keys.MAIL_CHECKIN_REMINDER_ENABLED,
                 SiteConfig.Keys.MAIL_LEAVE_APPROVAL_REMINDER_ENABLED,
@@ -347,6 +348,7 @@ public class SiteConfigServiceImpl implements SiteConfigService {
         createDefaultConfigIfNotExists(SiteConfig.Keys.MAIL_SENDER_NAME, "融媒体管理系统", "邮件发件人名称", SiteConfig.ConfigType.TEXT);
         createDefaultConfigIfNotExists(SiteConfig.Keys.MAIL_REMINDER_ADVANCE_MINUTES, "30", "执勤和晚自习提醒提前分钟数", SiteConfig.ConfigType.NUMBER);
         createDefaultConfigIfNotExists(SiteConfig.Keys.MAIL_OVERDUE_REMINDER_INTERVAL_HOURS, "24", "设备逾期归还提醒间隔小时数", SiteConfig.ConfigType.NUMBER);
+        createDefaultConfigIfNotExists(SiteConfig.Keys.MAIL_LOG_RETENTION_DAYS, "30", "邮件发送日志与验证码记录保留天数", SiteConfig.ConfigType.NUMBER);
         createDefaultConfigIfNotExists(SiteConfig.Keys.MAIL_DUTY_REMINDER_ENABLED, "true", "执勤提醒开关", SiteConfig.ConfigType.BOOLEAN);
         createDefaultConfigIfNotExists(SiteConfig.Keys.MAIL_CHECKIN_REMINDER_ENABLED, "true", "晚自习打卡提醒开关", SiteConfig.ConfigType.BOOLEAN);
         createDefaultConfigIfNotExists(SiteConfig.Keys.MAIL_LEAVE_APPROVAL_REMINDER_ENABLED, "true", "请假审批提醒开关", SiteConfig.ConfigType.BOOLEAN);
@@ -364,6 +366,7 @@ public class SiteConfigServiceImpl implements SiteConfigService {
         resetConfigToDefault(SiteConfig.Keys.MAIL_SENDER_NAME, "融媒体管理系统", "邮件发件人名称", SiteConfig.ConfigType.TEXT);
         resetConfigToDefault(SiteConfig.Keys.MAIL_REMINDER_ADVANCE_MINUTES, "30", "执勤和晚自习提醒提前分钟数", SiteConfig.ConfigType.NUMBER);
         resetConfigToDefault(SiteConfig.Keys.MAIL_OVERDUE_REMINDER_INTERVAL_HOURS, "24", "设备逾期归还提醒间隔小时数", SiteConfig.ConfigType.NUMBER);
+        resetConfigToDefault(SiteConfig.Keys.MAIL_LOG_RETENTION_DAYS, "30", "邮件发送日志与验证码记录保留天数", SiteConfig.ConfigType.NUMBER);
         resetConfigToDefault(SiteConfig.Keys.MAIL_DUTY_REMINDER_ENABLED, "true", "执勤提醒开关", SiteConfig.ConfigType.BOOLEAN);
         resetConfigToDefault(SiteConfig.Keys.MAIL_CHECKIN_REMINDER_ENABLED, "true", "晚自习打卡提醒开关", SiteConfig.ConfigType.BOOLEAN);
         resetConfigToDefault(SiteConfig.Keys.MAIL_LEAVE_APPROVAL_REMINDER_ENABLED, "true", "请假审批提醒开关", SiteConfig.ConfigType.BOOLEAN);

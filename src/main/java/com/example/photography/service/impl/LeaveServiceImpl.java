@@ -59,6 +59,9 @@ public class LeaveServiceImpl implements LeaveService {
 
     @Autowired
     private EmailNotificationService emailNotificationService;
+
+    @Autowired
+    private FileUploadUtil fileUploadUtil;
     
     // private final String uploadDir = "uploads/leave/"; // 未使用，保留占位可在实现附件上传目录时启用
     
@@ -431,8 +434,6 @@ public class LeaveServiceImpl implements LeaveService {
     
     @Override
     public String uploadLeaveAttachment(Long id, MultipartFile file) {
-        // 使用统一的文件上传工具
-        FileUploadUtil fileUploadUtil = new FileUploadUtil();
         String fileUrl = fileUploadUtil.uploadFile(file, "leave");
         
         // 更新请假申请的附件信息

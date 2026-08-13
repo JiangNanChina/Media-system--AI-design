@@ -644,6 +644,7 @@ nav,
   background: linear-gradient(135deg, #34c3d6, #24b8d7);
   border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: 999px;
+  overflow: hidden;
   box-shadow: 0 12px 28px rgba(36, 184, 215, 0.22);
   transition: transform 220ms var(--landing-ease), box-shadow 220ms ease;
 }
@@ -655,9 +656,11 @@ nav,
 }
 
 .brand-mark img {
-  width: 28px;
-  height: 28px;
+  width: 100%;
+  height: 100%;
+  display: block;
   object-fit: contain;
+  border-radius: 999px;
 }
 
 .brand > span:not(.brand-mark) {
@@ -765,8 +768,10 @@ nav a:focus-visible {
 
 .hero-fallback img {
   width: min(320px, 48vw);
+  aspect-ratio: 1;
   max-height: 42%;
   object-fit: contain;
+  border-radius: 999px;
   opacity: 0.5;
 }
 
@@ -1655,12 +1660,15 @@ nav a:focus-visible {
   flex: 0 0 auto;
   background: linear-gradient(135deg, #36c6d8, #1cb8d7);
   border-radius: 999px;
+  overflow: hidden;
 }
 
 .footer-brand-mark img {
-  width: 24px;
-  height: 24px;
+  width: 100%;
+  height: 100%;
+  display: block;
   object-fit: contain;
+  border-radius: 999px;
 }
 
 .footer-brand strong {
@@ -2251,8 +2259,8 @@ nav a:focus-visible {
   }
 
   .footer-brand-mark img {
-    width: 22px;
-    height: 22px;
+    width: 100%;
+    height: 100%;
   }
 }
 

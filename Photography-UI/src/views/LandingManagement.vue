@@ -61,7 +61,7 @@
                     <el-input v-model="settings['site.logo']" placeholder="上传后自动回填，也可填写图片地址" />
                     <el-upload
                       :show-file-list="false"
-                      :http-request="options => uploadSettingMedia('site.logo', options)"
+                      :http-request="selectSiteLogo"
                       accept="image/*"
                     >
                       <el-button :loading="isUploading('site.logo')">
@@ -495,6 +495,13 @@
         </el-form>
       </el-tab-pane>
     </el-tabs>
+
+    <LogoCropperDialog
+      v-model="logoCropVisible"
+      :file="logoCropFile"
+      @cropped="uploadCroppedSiteLogo"
+      @cancel="logoCropFile = null"
+    />
   </div>
 </template>
 
@@ -535,6 +542,7 @@ import {
 } from 'element-plus'
 import request from '@/utils/request'
 import { getSiteImageUrl } from '@/utils/imageUrl'
+import LogoCropperDialog from '@/components/LogoCropperDialog.vue'
 
 const settingDefaults = {
   'site.title': '融媒体管理系统',
@@ -592,8 +600,11 @@ const tab = ref('brand')
 const items = ref([])
 const saving = ref(false)
 const uploadingKey = ref('')
+const logoCropVisible = ref(false)
+const logoCropFile = ref(null)
 const settings = reactive({ ...settingDefaults })
 const maintenance = reactive({ enabled: false, title: '', message: '', password: '' })
+const pendingMediaCleanup = ref(new Set())
 
 const campusItems = computed(() => items.value.filter(item => item.sectionType === 'CAMPUS_FEATURE'))
 const departmentItems = computed(() => items.value.filter(item => item.sectionType === 'DEPARTMENT_SHOWCASE'))
@@ -616,7 +627,16 @@ const submissionStepPreview = computed(() => [
 const displaySetting = (key, fallback = '') => settings[key] || fallback
 const mediaPreview = key => getSiteImageUrl(settings[key]) || ''
 const isUploading = key => uploadingKey.value === key
-const clearSetting = key => { settings[key] = '' }
+const isManagedSiteMedia = value => /^\/?uploads\/site\/[^?#]+/i.test(String(value || '').trim())
+const rememberMediaCleanup = value => {
+  if (isManagedSiteMedia(value)) {
+    pendingMediaCleanup.value.add(String(value).trim())
+  }
+}
+const clearSetting = key => {
+  rememberMediaCleanup(settings[key])
+  settings[key] = ''
+}
 
 const settingsPayload = () => {
   return Object.keys(settingDefaults).reduce((payload, key) => {
@@ -641,6 +661,7 @@ const saveSettings = async () => {
   try {
     const response = await request.put('/landing/admin/settings', settingsPayload())
     Object.assign(settings, settingDefaults, response.data || {})
+    await cleanupPendingMedia()
     ElMessage.success('落地页设置已保存')
   } finally {
     saving.value = false
@@ -650,6 +671,7 @@ const saveSettings = async () => {
 const uploadSettingMedia = async (key, options) => {
   uploadingKey.value = key
   try {
+    rememberMediaCleanup(settings[key])
     const data = new FormData()
     data.append('file', options.file)
     const response = await request.post('/landing/admin/media', data, {
@@ -666,6 +688,36 @@ const uploadSettingMedia = async (key, options) => {
   }
 }
 
+const selectSiteLogo = options => {
+  const file = options.file
+  if (!file?.type?.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件')
+    options.onError?.(new Error('请选择图片文件'))
+    return
+  }
+  if (file.size > 10 * 1024 * 1024) {
+    ElMessage.warning('LOGO图片不能超过 10MB')
+    options.onError?.(new Error('LOGO图片过大'))
+    return
+  }
+
+  logoCropFile.value = file
+  logoCropVisible.value = true
+  options.onSuccess?.({})
+}
+
+const uploadCroppedSiteLogo = async file => {
+  uploadingKey.value = 'site.logo'
+  try {
+    rememberMediaCleanup(settings['site.logo'])
+    settings['site.logo'] = await uploadLandingMedia(file)
+    logoCropFile.value = null
+    ElMessage.success('圆形LOGO已上传，请保存设置')
+  } finally {
+    uploadingKey.value = ''
+  }
+}
+
 const uploadHero = options => uploadSettingMedia('landing.hero.media', options)
 
 const uploadLandingMedia = async file => {
@@ -676,6 +728,12 @@ const uploadLandingMedia = async file => {
     timeout: 10 * 60 * 1000
   })
   return response.data
+}
+
+const cleanupPendingMedia = async () => {
+  const mediaUrls = Array.from(pendingMediaCleanup.value)
+  pendingMediaCleanup.value.clear()
+  await Promise.allSettled(mediaUrls.map(mediaUrl => request.delete('/landing/admin/media', { params: { mediaUrl } })))
 }
 
 const outputSize = aspect => aspect === '16:9'
@@ -730,6 +788,7 @@ const ContentTable = defineComponent({
     const visible = ref(false)
     const currentId = ref(null)
     const form = reactive({ title: '', summary: '', mediaUrl: '', linkUrl: '', published: true, sortOrder: 0 })
+    const pendingContentMediaCleanup = ref(new Set())
     const crop = reactive({
       visible: false,
       uploading: false,
@@ -763,15 +822,33 @@ const ContentTable = defineComponent({
     const save = async () => {
       const body = { ...form, sectionType: props.type }
       currentId.value ? await request.put(`/landing/admin/items/${currentId.value}`, body) : await request.post('/landing/admin/items', body)
+      await cleanupContentMedia()
       visible.value = false
       ElMessage.success('内容已保存')
       emit('changed')
     }
     const remove = async id => {
       await ElMessageBox.confirm('确认删除这条内容？', '删除确认')
+      const target = props.items?.find(item => item.id === id)
       await request.delete(`/landing/admin/items/${id}`)
+      rememberContentMediaCleanup(target?.mediaUrl)
+      await cleanupContentMedia()
       ElMessage.success('内容已删除')
       emit('changed')
+    }
+    const rememberContentMediaCleanup = value => {
+      if (isManagedSiteMedia(value)) {
+        pendingContentMediaCleanup.value.add(String(value).trim())
+      }
+    }
+    const clearContentMedia = () => {
+      rememberContentMediaCleanup(form.mediaUrl)
+      form.mediaUrl = ''
+    }
+    const cleanupContentMedia = async () => {
+      const mediaUrls = Array.from(pendingContentMediaCleanup.value)
+      pendingContentMediaCleanup.value.clear()
+      await Promise.allSettled(mediaUrls.map(mediaUrl => request.delete('/landing/admin/media', { params: { mediaUrl } })))
     }
     const resetCrop = () => {
       if (crop.sourceUrl) URL.revokeObjectURL(crop.sourceUrl)
@@ -814,6 +891,7 @@ const ContentTable = defineComponent({
       crop.uploading = true
       try {
         const croppedFile = await cropImageFile(crop)
+        rememberContentMediaCleanup(form.mediaUrl)
         form.mediaUrl = await uploadLandingMedia(croppedFile)
         ElMessage.success('图片已裁剪并上传，请保存内容')
         resetCrop()
@@ -889,7 +967,7 @@ const ContentTable = defineComponent({
             h('p', { class: 'media-hint' }, recommendedText.value),
             form.mediaUrl ? h('div', { class: 'media-preview-row' }, [
               h(ElImage, { src: getSiteImageUrl(form.mediaUrl), fit: 'cover', previewSrcList: [getSiteImageUrl(form.mediaUrl)], hideOnClickModal: true, class: 'media-preview-image' }),
-              h(ElButton, { text: true, type: 'danger', onClick: () => { form.mediaUrl = '' } }, () => '清除图片')
+              h(ElButton, { text: true, type: 'danger', onClick: clearContentMedia }, () => '清除图片')
             ]) : null
           ]))
         ]),
@@ -1134,6 +1212,10 @@ onMounted(load)
   border: 1px solid rgba(188, 223, 235, 0.8);
 }
 
+.media-preview.logo img {
+  border-radius: 999px;
+}
+
 .media-preview strong {
   display: block;
   color: #173f56;
@@ -1283,13 +1365,15 @@ onMounted(load)
   color: #0f8fc3;
   background: #fff;
   border-radius: 999px;
+  overflow: hidden;
 }
 
 .preview-logo img {
   position: static;
-  width: 20px;
-  height: 20px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  border-radius: 999px;
 }
 
 .preview-hero-copy {

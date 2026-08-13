@@ -858,10 +858,13 @@ onUnmounted(() => {
 }
 
 .site-logo {
+  width: 96px;
+  height: 96px;
   max-width: 120px;
-  max-height: 80px;
+  max-height: 120px;
   object-fit: contain;
-  border-radius: var(--radius-md);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
   box-shadow: var(--shadow-base);
 }
 

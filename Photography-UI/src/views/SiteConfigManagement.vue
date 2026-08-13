@@ -55,19 +55,16 @@
               </div>
             </template>
             <div class="upload-section">
-              <div class="current-image" v-if="currentLogo">
+              <div class="current-image logo-preview" v-if="currentLogo">
                 <img :src="currentLogo" alt="当前LOGO" />
               </div>
               <el-upload
                 class="logo-uploader"
-                :action="`${apiBaseUrl}/site-config/admin/upload-logo`"
-                :headers="uploadHeaders"
                 :show-file-list="false"
-                :on-success="handleLogoSuccess"
-                :before-upload="beforeUpload"
+                :http-request="selectLogoForCrop"
                 accept="image/*"
               >
-                <el-button type="primary">
+                <el-button type="primary" :loading="logoUploading">
                   <el-icon><Upload /></el-icon>
                   上传LOGO
                 </el-button>
@@ -116,19 +113,22 @@
     <div class="mail-config-section">
       <h3>QQ邮箱与提醒设置</h3>
       <el-card class="mail-config-panel">
-        <el-form :model="mailForm" label-width="160px">
+        <el-form :model="mailForm" class="mail-config-form" label-width="132px">
           <el-row :gutter="20">
-            <el-col :xs="24" :md="8">
+            <el-col :xs="24">
               <el-form-item label="启用邮件功能">
                 <el-switch v-model="mailForm.enabled" />
               </el-form-item>
             </el-col>
-            <el-col :xs="24" :md="8">
+          </el-row>
+
+          <el-row :gutter="20">
+            <el-col :xs="24" :md="12">
               <el-form-item label="QQ邮箱账号">
                 <el-input v-model="mailForm.qqAccount" placeholder="example@qq.com" clearable />
               </el-form-item>
             </el-col>
-            <el-col :xs="24" :md="8">
+            <el-col :xs="24" :md="12">
               <el-form-item label="QQ邮箱授权码">
                 <el-input
                   v-model="mailForm.qqAuthCode"
@@ -142,12 +142,12 @@
           </el-row>
 
           <el-row :gutter="20">
-            <el-col :xs="24" :md="8">
+            <el-col :xs="24" :md="12" :xl="8">
               <el-form-item label="发件人名称">
                 <el-input v-model="mailForm.senderName" placeholder="融媒体管理系统" clearable />
               </el-form-item>
             </el-col>
-            <el-col :xs="24" :md="8">
+            <el-col :xs="24" :md="12" :xl="8">
               <el-form-item label="SMTP服务器">
                 <el-input
                   v-model="mailForm.smtpHost"
@@ -161,13 +161,19 @@
                 </el-input>
               </el-form-item>
             </el-col>
-            <el-col :xs="24" :md="4">
+            <el-col :xs="24" :md="12" :xl="6">
               <el-form-item label="SMTP端口">
-                <el-input-number v-model="mailForm.smtpPort" :min="1" :max="65535" style="width: 100%" />
+                <el-input-number
+                  v-model="mailForm.smtpPort"
+                  class="mail-number-input"
+                  :min="1"
+                  :max="65535"
+                  controls-position="right"
+                />
               </el-form-item>
             </el-col>
-            <el-col :xs="24" :md="4">
-              <el-form-item label="SSL">
+            <el-col :xs="24" :md="12" :xl="2">
+              <el-form-item label="SSL" class="mail-compact-form-item" label-width="48px">
                 <el-switch v-model="mailForm.smtpSslEnabled" />
               </el-form-item>
             </el-col>
@@ -176,22 +182,45 @@
           <el-divider content-position="left">提醒规则</el-divider>
 
           <el-row :gutter="20">
-            <el-col :xs="24" :md="8">
+            <el-col :xs="24" :md="12" :xl="8">
               <el-form-item label="提前提醒分钟数">
-                <el-input-number v-model="mailForm.reminderAdvanceMinutes" :min="0" :max="1440" style="width: 100%" />
+                <el-input-number
+                  v-model="mailForm.reminderAdvanceMinutes"
+                  class="mail-number-input"
+                  :min="0"
+                  :max="1440"
+                />
               </el-form-item>
             </el-col>
-            <el-col :xs="24" :md="8">
+            <el-col :xs="24" :md="12" :xl="8">
               <el-form-item label="逾期提醒间隔(小时)">
-                <el-input-number v-model="mailForm.overdueReminderIntervalHours" :min="1" :max="720" style="width: 100%" />
+                <el-input-number
+                  v-model="mailForm.overdueReminderIntervalHours"
+                  class="mail-number-input"
+                  :min="1"
+                  :max="720"
+                />
               </el-form-item>
             </el-col>
-            <el-col :xs="24" :md="8">
+            <el-col :xs="24" :md="12" :xl="8">
+              <el-form-item label="日志保留天数">
+                <el-input-number
+                  v-model="mailForm.logRetentionDays"
+                  class="mail-number-input"
+                  :min="1"
+                  :max="3650"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <el-row :gutter="20">
+            <el-col :xs="24" :md="12" :xl="8">
               <el-form-item label="执勤提醒">
                 <el-switch v-model="mailForm.dutyReminderEnabled" />
               </el-form-item>
             </el-col>
-            <el-col :xs="24" :md="8">
+            <el-col :xs="24" :md="12" :xl="8">
               <el-form-item label="晚自习提醒">
                 <el-switch v-model="mailForm.checkinReminderEnabled" />
               </el-form-item>
@@ -199,17 +228,17 @@
           </el-row>
 
           <el-row :gutter="20">
-            <el-col :xs="24" :md="8">
+            <el-col :xs="24" :md="12" :xl="8">
               <el-form-item label="请假审批提醒">
                 <el-switch v-model="mailForm.leaveApprovalReminderEnabled" />
               </el-form-item>
             </el-col>
-            <el-col :xs="24" :md="8">
+            <el-col :xs="24" :md="12" :xl="8">
               <el-form-item label="设备逾期提醒">
                 <el-switch v-model="mailForm.borrowOverdueReminderEnabled" />
               </el-form-item>
             </el-col>
-            <el-col :xs="24" :md="8">
+            <el-col :xs="24" :md="12" :xl="8">
               <el-form-item label="入部面试QQ群">
                 <el-input v-model.trim="mailForm.joinInterviewQqGroup" maxlength="12" placeholder="请输入面试QQ群号" clearable />
               </el-form-item>
@@ -487,6 +516,13 @@
         <img :src="previewUrl" alt="预览图片" class="preview-image" />
       </div>
     </el-dialog>
+
+    <LogoCropperDialog
+      v-model="logoCropVisible"
+      :file="logoCropFile"
+      @cropped="uploadCroppedLogo"
+      @cancel="logoCropFile = null"
+    />
   </div>
 </template>
 
@@ -496,6 +532,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Setting, RefreshLeft, Refresh, Upload, Tools } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import { getSiteImageUrl, getUploadedImageUrl } from '@/utils/imageUrl'
+import LogoCropperDialog from '@/components/LogoCropperDialog.vue'
 
 // 响应式数据
 const loading = ref(false)
@@ -510,6 +547,9 @@ const savingMailConfig = ref(false)
 const testingMail = ref(false)
 const testMailEmail = ref('')
 const mailAuthCodeConfigured = ref(false)
+const logoCropVisible = ref(false)
+const logoCropFile = ref(null)
+const logoUploading = ref(false)
 const qqSmtpHost = 'smtp.qq.com'
 const mailLogsLoading = ref(false)
 const mailLogs = ref([])
@@ -535,6 +575,7 @@ const mailForm = reactive({
   senderName: '融媒体管理系统',
   reminderAdvanceMinutes: 30,
   overdueReminderIntervalHours: 24,
+  logRetentionDays: 30,
   dutyReminderEnabled: true,
   checkinReminderEnabled: true,
   leaveApprovalReminderEnabled: true,
@@ -552,6 +593,7 @@ const mailConfigDefinitions = [
   { field: 'senderName', key: 'mail.sender_name', description: '邮件发件人名称', configType: 'TEXT', defaultValue: '融媒体管理系统' },
   { field: 'reminderAdvanceMinutes', key: 'mail.reminder_advance_minutes', description: '执勤和晚自习提醒提前分钟数', configType: 'NUMBER', defaultValue: 30 },
   { field: 'overdueReminderIntervalHours', key: 'mail.overdue_reminder_interval_hours', description: '设备逾期归还提醒间隔小时数', configType: 'NUMBER', defaultValue: 24 },
+  { field: 'logRetentionDays', key: 'mail.log_retention_days', description: '邮件发送日志与验证码记录保留天数', configType: 'NUMBER', defaultValue: 30 },
   { field: 'dutyReminderEnabled', key: 'mail.duty_reminder_enabled', description: '执勤提醒开关', configType: 'BOOLEAN', defaultValue: true },
   { field: 'checkinReminderEnabled', key: 'mail.checkin_reminder_enabled', description: '晚自习打卡提醒开关', configType: 'BOOLEAN', defaultValue: true },
   { field: 'leaveApprovalReminderEnabled', key: 'mail.leave_approval_reminder_enabled', description: '请假审批提醒开关', configType: 'BOOLEAN', defaultValue: true },
@@ -807,6 +849,10 @@ const validateMailSettings = ({ requireAuthCode = false } = {}) => {
     ElMessage.warning('SMTP端口必须在 1 到 65535 之间，QQ邮箱推荐 465')
     return false
   }
+  if (!Number.isInteger(Number(mailForm.logRetentionDays)) || Number(mailForm.logRetentionDays) < 1 || Number(mailForm.logRetentionDays) > 3650) {
+    ElMessage.warning('日志保留天数必须在 1 到 3650 天之间')
+    return false
+  }
   if (requireAuthCode && !mailAuthCodeConfigured.value && !String(mailForm.qqAuthCode || '').trim()) {
     ElMessage.warning('请填写QQ邮箱SMTP授权码，授权码不是QQ登录密码')
     return false
@@ -1039,13 +1085,38 @@ const beforeUpload = (file) => {
   return true
 }
 
-// LOGO上传成功
-const handleLogoSuccess = (response) => {
-  if (response.success) {
-    ElMessage.success('LOGO上传成功')
-    loadConfigs()
-  } else {
-    ElMessage.error(response.message || 'LOGO上传失败')
+const selectLogoForCrop = (options) => {
+  const file = options.file
+  if (!beforeUpload(file)) {
+    options.onError?.(new Error('LOGO文件不符合要求'))
+    return
+  }
+
+  logoCropFile.value = file
+  logoCropVisible.value = true
+  options.onSuccess?.({})
+}
+
+const uploadCroppedLogo = async (file) => {
+  logoUploading.value = true
+  try {
+    const data = new FormData()
+    data.append('file', file)
+    const response = await request.post('/site-config/admin/upload-logo', data, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    if (response.success) {
+      ElMessage.success('圆形LOGO上传成功')
+      logoCropFile.value = null
+      await loadConfigs()
+    } else {
+      ElMessage.error(response.message || 'LOGO上传失败')
+    }
+  } catch (error) {
+    ElMessage.error(error.message || 'LOGO上传失败')
+    console.error('LOGO上传失败:', error)
+  } finally {
+    logoUploading.value = false
   }
 }
 
@@ -1236,6 +1307,31 @@ const resetForm = () => {
   border-radius: 6px;
 }
 
+.mail-config-form {
+  width: 100%;
+}
+
+.mail-config-form :deep(.el-row) {
+  row-gap: 4px;
+}
+
+.mail-config-form :deep(.el-form-item) {
+  margin-bottom: 18px;
+}
+
+.mail-number-input {
+  width: 100%;
+  min-width: 190px;
+}
+
+.mail-number-input :deep(.el-input__wrapper) {
+  min-width: 0;
+}
+
+.mail-compact-form-item {
+  min-width: 120px;
+}
+
 .mail-actions {
   display: flex;
   align-items: center;
@@ -1246,6 +1342,32 @@ const resetForm = () => {
 .mail-test-input {
   width: 420px;
   max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  .mail-config-form {
+    --mail-label-width: 118px;
+  }
+
+  .mail-config-form :deep(.el-form-item__label) {
+    width: var(--mail-label-width) !important;
+  }
+
+  .mail-config-form :deep(.el-form-item__content) {
+    margin-left: var(--mail-label-width) !important;
+  }
+
+  .mail-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mail-actions .el-button,
+  .mail-test-input,
+  .mail-number-input {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .mail-log-section {
@@ -1356,10 +1478,24 @@ const resetForm = () => {
   overflow: hidden;
 }
 
+.current-image.logo-preview {
+  width: 82px;
+  height: 82px;
+  border-radius: 999px;
+  background: #fff;
+}
+
 .current-image img {
   max-width: 100%;
   max-height: 100%;
   object-fit: cover;
+}
+
+.current-image.logo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 999px;
 }
 
 .config-table-section h3 {

@@ -177,6 +177,7 @@ import {
   User
 } from '@element-plus/icons-vue'
 import request from '@/utils/request'
+import { getSiteImageUrl } from '@/utils/imageUrl'
 
 const router = useRouter()
 const formRef = ref()
@@ -185,7 +186,8 @@ const work = ref(null)
 const colleges = ref([])
 const submitting = ref(false)
 const progress = ref(0)
-const logoUrl = '/logo.svg'
+const siteLogo = ref('')
+const logoUrl = computed(() => siteLogo.value || '/logo.svg')
 let progressTimer
 
 const currentYear = new Date().getFullYear()
@@ -257,6 +259,15 @@ const fetchColleges = async () => {
   }
 }
 
+const fetchSiteConfig = async () => {
+  try {
+    const response = await request.get('/site-config/public', { silent: true })
+    siteLogo.value = getSiteImageUrl(response.data?.['site.logo']) || ''
+  } catch (error) {
+    console.error('获取站点配置失败:', error)
+  }
+}
+
 const submit = async () => {
   await formRef.value?.validate()
   if (!consent.value) {
@@ -294,6 +305,7 @@ const submit = async () => {
 
 onMounted(async () => {
   fetchColleges()
+  fetchSiteConfig()
   const status = await request.get('/maintenance/public/status', { silent: true })
   if (status.data?.enabled && !status.data?.unlocked) router.replace({ path: '/maintenance', query: { redirect: '/join-us' } })
 })
@@ -415,7 +427,7 @@ onBeforeUnmount(() => clearInterval(progressTimer))
   object-fit: contain;
   padding: 18px;
   background: rgba(255, 255, 255, 0.92);
-  border-radius: 24px;
+  border-radius: 999px;
   box-shadow: 0 20px 42px rgba(0, 18, 30, 0.22);
 }
 

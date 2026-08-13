@@ -13,13 +13,25 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import com.example.photography.util.FileUploadUtil;
 import org.springframework.util.StringUtils;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class LandingService {
+    private static final String MANAGED_SITE_UPLOAD_PREFIX = "/uploads/site/";
+
+    private static final Set<String> MEDIA_CONFIG_KEYS = Set.of(
+            SiteConfig.Keys.SITE_LOGO,
+            SiteConfig.Keys.LOGIN_BACKGROUND,
+            SiteConfig.Keys.LANDING_HERO_MEDIA,
+            SiteConfig.Keys.LANDING_WECHAT_QR
+    );
+
     public static final List<String> PUBLIC_KEYS = List.of(
             SiteConfig.Keys.SITE_TITLE, SiteConfig.Keys.SITE_SUBTITLE, SiteConfig.Keys.SITE_LOGO,
             SiteConfig.Keys.LOGIN_BACKGROUND, SiteConfig.Keys.LANDING_HERO_TITLE,
@@ -76,6 +88,7 @@ public class LandingService {
         LandingContentItem item = id == null ? new LandingContentItem() : itemRepository.findById(id)
                 .filter(value -> !Boolean.TRUE.equals(value.getDeleted()))
                 .orElseThrow(() -> new IllegalArgumentException("落地页内容不存在"));
+        String previousMediaUrl = item.getMediaUrl();
         item.setSectionType(request.getSectionType());
         item.setTitle(request.getTitle().trim());
         item.setSummary(request.getSummary());
@@ -83,30 +96,50 @@ public class LandingService {
         item.setLinkUrl(request.getLinkUrl());
         item.setPublished(!Boolean.FALSE.equals(request.getPublished()));
         item.setSortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder());
-        return itemRepository.save(item);
+        LandingContentItem saved = itemRepository.save(item);
+        deleteUnusedManagedMediaAfterCommit(mediaCandidates(previousMediaUrl), mediaCandidates(saved.getMediaUrl()));
+        return saved;
     }
 
     public void deleteItem(Long id) {
         LandingContentItem item = itemRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("落地页内容不存在"));
+        String previousMediaUrl = item.getMediaUrl();
         item.setDeleted(true);
         itemRepository.save(item);
+        deleteUnusedManagedMediaAfterCommit(mediaCandidates(previousMediaUrl), Set.of());
     }
 
     public Map<String, String> saveSettings(Map<String, String> settings) {
+        Set<String> replacedMedia = new LinkedHashSet<>();
+        Set<String> retainedMedia = new LinkedHashSet<>();
         for (Map.Entry<String, String> entry : settings.entrySet()) {
             if (!PUBLIC_KEYS.contains(entry.getKey())) {
                 continue;
             }
+            String configKey = entry.getKey();
+            String configValue = entry.getValue();
+            if (MEDIA_CONFIG_KEYS.contains(configKey)) {
+                String previousValue = siteConfigService.getConfigValue(configKey, null);
+                String previousMedia = normalizeManagedSiteUploadPath(previousValue);
+                String currentMedia = normalizeManagedSiteUploadPath(configValue);
+                if (currentMedia != null) {
+                    retainedMedia.add(currentMedia);
+                }
+                if (previousMedia != null && !previousMedia.equals(currentMedia)) {
+                    replacedMedia.add(previousMedia);
+                }
+            }
             SiteConfigRequest request = new SiteConfigRequest();
-            request.setConfigKey(entry.getKey());
-            request.setConfigValue(entry.getValue());
-            request.setConfigType(entry.getKey().contains("media") || entry.getKey().contains("logo")
-                    || entry.getKey().contains("background") || entry.getKey().contains("qr")
+            request.setConfigKey(configKey);
+            request.setConfigValue(configValue);
+            request.setConfigType(configKey.contains("media") || configKey.contains("logo")
+                    || configKey.contains("background") || configKey.contains("qr")
                     ? SiteConfig.ConfigType.IMAGE : SiteConfig.ConfigType.TEXT);
             request.setDescription("落地页配置");
             siteConfigService.saveOrUpdateConfig(request);
         }
+        deleteUnusedManagedMediaAfterCommit(replacedMedia, retainedMedia);
         return getPublicContent().getSettings();
     }
 
@@ -120,6 +153,10 @@ public class LandingService {
             throw new IllegalArgumentException("仅支持JPG、PNG、WebP、GIF、MP4、MOV和WebM文件");
         }
         return fileUploadUtil.uploadFile(file, "site", 500L * 1024 * 1024, false);
+    }
+
+    public void deleteUnreferencedMedia(String mediaUrl) {
+        deleteUnusedManagedMediaAfterCommit(mediaCandidates(mediaUrl), Set.of());
     }
 
     public void initializeDefaults() {
@@ -138,6 +175,80 @@ public class LandingService {
         item.setSectionType(type); item.setTitle(title); item.setSummary(summary);
         item.setPublished(true); item.setSortOrder(order);
         itemRepository.save(item);
+    }
+
+    private void deleteUnusedManagedMediaAfterCommit(Collection<String> candidates, Collection<String> retainedMedia) {
+        Set<String> mediaToDelete = candidates.stream()
+                .map(this::normalizeManagedSiteUploadPath)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (mediaToDelete.isEmpty()) {
+            return;
+        }
+
+        Set<String> activeReferences = collectManagedMediaReferences();
+        retainedMedia.stream()
+                .map(this::normalizeManagedSiteUploadPath)
+                .filter(Objects::nonNull)
+                .forEach(activeReferences::add);
+        mediaToDelete.removeAll(activeReferences);
+
+        if (mediaToDelete.isEmpty()) {
+            return;
+        }
+
+        Runnable deleteTask = () -> mediaToDelete.forEach(fileUploadUtil::deleteFile);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    deleteTask.run();
+                }
+            });
+        } else {
+            deleteTask.run();
+        }
+    }
+
+    private Collection<String> mediaCandidates(String mediaUrl) {
+        return Collections.singleton(mediaUrl);
+    }
+
+    private Set<String> collectManagedMediaReferences() {
+        Set<String> references = new LinkedHashSet<>();
+        siteConfigService.getAllConfigs().stream()
+                .map(SiteConfig::getConfigValue)
+                .map(this::normalizeManagedSiteUploadPath)
+                .filter(Objects::nonNull)
+                .forEach(references::add);
+        itemRepository.findByDeletedFalseOrderBySectionTypeAscSortOrderAsc().stream()
+                .map(LandingContentItem::getMediaUrl)
+                .map(this::normalizeManagedSiteUploadPath)
+                .filter(Objects::nonNull)
+                .forEach(references::add);
+        return references;
+    }
+
+    private String normalizeManagedSiteUploadPath(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String path = value.trim().replace('\\', '/');
+        int queryIndex = path.indexOf('?');
+        if (queryIndex >= 0) {
+            path = path.substring(0, queryIndex);
+        }
+        int fragmentIndex = path.indexOf('#');
+        if (fragmentIndex >= 0) {
+            path = path.substring(0, fragmentIndex);
+        }
+        if (path.startsWith("uploads/site/")) {
+            path = "/" + path;
+        }
+        if (!path.startsWith(MANAGED_SITE_UPLOAD_PREFIX) || path.contains("..")) {
+            return null;
+        }
+        return path;
     }
 
     private String defaultValue(String key) {

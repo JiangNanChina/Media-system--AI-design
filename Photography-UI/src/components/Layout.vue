@@ -11,7 +11,17 @@
       <!-- 侧边栏 -->
       <el-aside 
         :width="sidebarWidth" 
-        :class="['sidebar', { 'mobile-sidebar': isMobile, 'sidebar-open': !isCollapse }]"
+        :class="[
+          'sidebar',
+          {
+            'mobile-sidebar': isMobile,
+            'sidebar-open': !isCollapse,
+            'sidebar-collapsed': isCollapse && !isMobile,
+            'sidebar-animating': sidebarMotionState !== 'idle',
+            'sidebar-collapsing': sidebarMotionState === 'collapsing',
+            'sidebar-expanding': sidebarMotionState === 'expanding'
+          }
+        ]"
       >
         <div class="logo">
           <div class="logo-container" :class="{ 'collapsed': isCollapse && !isMobile }">
@@ -29,7 +39,7 @@
                 :size="isCollapse && !isMobile ? 24 : 28"
               ><Camera /></el-icon>
             </div>
-            <div v-show="!isCollapse || isMobile" class="logo-content">
+            <div v-show="!menuCollapse || isMobile" class="logo-content">
               <span class="logo-text">{{ siteConfig.siteTitle || '融媒体管理系统' }}</span>
               <span class="logo-subtitle">{{ siteConfig.siteSubtitle || 'Photography System' }}</span>
             </div>
@@ -39,7 +49,7 @@
         <el-scrollbar class="menu-scrollbar">
           <el-menu
             :default-active="$route.path"
-            :collapse="isCollapse && !isMobile"
+            :collapse="menuCollapse && !isMobile"
             :unique-opened="true"
             background-color="transparent"
             text-color="#b8c5d1"
@@ -107,7 +117,7 @@
                 class="sidebar-toggle modern-toggle"
               >
                 <el-icon size="20">
-                  <component :is="isMobile ? 'Menu' : (isCollapse ? 'Expand' : 'Fold')" />
+                  <component :is="isMobile ? 'Menu' : (menuCollapse ? 'Expand' : 'Fold')" />
                 </el-icon>
               </el-button>
               
@@ -284,16 +294,21 @@ import { useUserStore } from '@/stores/user'
 import { useAnnouncementStore } from '@/stores/announcement'
 import AnnouncementDialog from '@/components/AnnouncementDialog.vue'
 import request from '@/utils/request'
-import { getSiteImageUrl } from '@/utils/imageUrl'
+import { getSiteImageUrl, getUploadedImageUrl } from '@/utils/imageUrl'
 import { useAppShortcuts } from '@/composables/useKeyboardShortcuts'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const announcementStore = useAnnouncementStore()
+const SIDEBAR_ANIMATION_DURATION = 320
+const SIDEBAR_MENU_SWITCH_DELAY = 190
 
 // 响应式数据
 const isCollapse = ref(false)
+const menuCollapse = ref(false)
+const sidebarMotionState = ref('idle')
+const sidebarAnimatedWidth = ref(200)
 const isMobile = ref(false)
 const announcementVisible = ref(false)
 const announcements = ref([])
@@ -314,18 +329,12 @@ const currentLoginAnnouncement = ref(null)
 const loginAnnouncementIndex = ref(0)
 const loginAnnouncementCountdown = ref(3)
 let loginAnnouncementTimer = null
+let sidebarAnimationTimer = null
+let sidebarMenuSwitchTimer = null
 
 // 头像URL处理函数
 const getAvatarUrl = (avatarUrl) => {
-  if (!avatarUrl) return ''
-  
-  // 如果是完整URL，直接返回
-  if (avatarUrl.startsWith('http')) {
-    return avatarUrl
-  }
-  
-  // 如果是相对路径，直接返回（不添加API前缀，因为静态资源直接访问）
-  return avatarUrl
+  return getUploadedImageUrl(avatarUrl)
 }
 
 // 计算属性
@@ -333,7 +342,7 @@ const sidebarWidth = computed(() => {
   if (isMobile.value) {
     return isCollapse.value ? '0px' : '200px'
   }
-  return isCollapse.value ? '64px' : '200px'
+  return `${sidebarAnimatedWidth.value}px`
 })
 
 // 当前页面标题
@@ -481,12 +490,96 @@ const breadcrumbItems = computed(() => {
   return items
 })
 
+const clearSidebarMotionTimers = () => {
+  if (sidebarAnimationTimer) {
+    clearTimeout(sidebarAnimationTimer)
+    sidebarAnimationTimer = null
+  }
+
+  if (sidebarMenuSwitchTimer) {
+    clearTimeout(sidebarMenuSwitchTimer)
+    sidebarMenuSwitchTimer = null
+  }
+}
+
+const finishSidebarMotion = () => {
+  clearSidebarMotionTimers()
+
+  if (isCollapse.value && !isMobile.value) {
+    sidebarMenuSwitchTimer = setTimeout(() => {
+      menuCollapse.value = true
+      sidebarMenuSwitchTimer = null
+    }, SIDEBAR_MENU_SWITCH_DELAY)
+  }
+
+  sidebarAnimationTimer = setTimeout(() => {
+    menuCollapse.value = isCollapse.value && !isMobile.value
+    sidebarMotionState.value = 'idle'
+    sidebarAnimationTimer = null
+  }, SIDEBAR_ANIMATION_DURATION)
+}
+
+const setSidebarCollapsed = (collapsed, animated = true) => {
+  const targetCollapsed = Boolean(collapsed)
+
+  if (isMobile.value) {
+    isCollapse.value = targetCollapsed
+    menuCollapse.value = false
+    sidebarAnimatedWidth.value = targetCollapsed ? 0 : 200
+    sidebarMotionState.value = 'idle'
+    clearSidebarMotionTimers()
+    return
+  }
+
+  if (!animated) {
+    isCollapse.value = targetCollapsed
+    menuCollapse.value = targetCollapsed
+    sidebarAnimatedWidth.value = targetCollapsed ? 76 : 200
+    sidebarMotionState.value = 'idle'
+    clearSidebarMotionTimers()
+    return
+  }
+
+  if (targetCollapsed === isCollapse.value && sidebarMotionState.value === 'idle') {
+    return
+  }
+
+  clearSidebarMotionTimers()
+
+  if (targetCollapsed) {
+    sidebarMotionState.value = 'collapsing'
+    isCollapse.value = true
+    sidebarAnimatedWidth.value = 200
+    requestAnimationFrame(() => {
+      sidebarAnimatedWidth.value = 76
+      finishSidebarMotion()
+    })
+    return
+  }
+
+  sidebarMotionState.value = 'expanding'
+  menuCollapse.value = false
+  sidebarAnimatedWidth.value = 76
+  requestAnimationFrame(() => {
+    isCollapse.value = false
+    sidebarAnimatedWidth.value = 200
+    finishSidebarMotion()
+  })
+}
+
 // 检查是否为移动端
 const checkMobile = () => {
-  isMobile.value = window.innerWidth <= 768
+  const nextIsMobile = window.innerWidth <= 768
+  isMobile.value = nextIsMobile
   // 移动端默认收起侧边栏
-  if (isMobile.value) {
+  if (nextIsMobile) {
     isCollapse.value = true
+    menuCollapse.value = false
+    sidebarAnimatedWidth.value = 0
+    sidebarMotionState.value = 'idle'
+  } else {
+    menuCollapse.value = isCollapse.value
+    sidebarAnimatedWidth.value = isCollapse.value ? 76 : 200
   }
 }
 
@@ -497,13 +590,13 @@ const handleResize = () => {
 
 // 切换侧边栏
 const toggleSidebar = () => {
-  isCollapse.value = !isCollapse.value
+  setSidebarCollapsed(!isCollapse.value)
 }
 
 // 关闭移动端侧边栏
 const closeMobileSidebar = () => {
   if (isMobile.value) {
-    isCollapse.value = true
+    setSidebarCollapsed(true, false)
   }
 }
 
@@ -521,7 +614,7 @@ const handleMenuSelect = async (index) => {
   if (isMobile.value) {
     // 延迟收起，确保路由跳转完成
     setTimeout(() => {
-      isCollapse.value = true
+      setSidebarCollapsed(true, false)
     }, 100)
   }
 }
@@ -769,6 +862,8 @@ onUnmounted(() => {
   if (loginAnnouncementTimer) {
     clearInterval(loginAnnouncementTimer)
   }
+
+  clearSidebarMotionTimers()
 })
 
 // 在开发环境下暴露调试方法到全局（放在所有函数定义之后）
@@ -791,7 +886,7 @@ if (process.env.NODE_ENV === 'development') {
 // 监听路由变化，移动端自动收起侧边栏
 watch(() => route.path, () => {
   if (isMobile.value) {
-    isCollapse.value = true
+    setSidebarCollapsed(true, false)
   }
 })
 </script>
@@ -806,8 +901,15 @@ watch(() => route.path, () => {
 /* 现代化侧边栏样式 */
 .sidebar {
   background: linear-gradient(180deg, #2c3e50 0%, #34495e 100%);
-  transition: width var(--duration-normal) var(--easing-ease);
+  transition:
+    width 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    min-width 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-width 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    flex-basis 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 240ms ease,
+    background 240ms ease;
   overflow: hidden;
+  will-change: width, flex-basis;
   box-shadow: var(--shadow-base);
   position: relative;
   z-index: 10;
@@ -843,7 +945,11 @@ watch(() => route.path, () => {
   display: flex;
   align-items: center;
   gap: var(--spacing-3);
-  transition: all var(--duration-normal) var(--easing-ease);
+  transition:
+    width 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    gap 260ms ease,
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .logo-container.collapsed {
@@ -855,20 +961,25 @@ watch(() => route.path, () => {
   width: 40px;
   height: 40px;
   background: var(--gradient-primary);
-  border-radius: var(--radius-md);
+  border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--color-white);
   box-shadow: var(--shadow-hover);
   flex-shrink: 0;
-  transition: all var(--duration-normal) var(--easing-ease);
+  transition:
+    width 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 240ms ease,
+    background 240ms ease;
 }
 
 .logo-container.collapsed .logo-icon {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: 999px;
 }
 
 /* LOGO图片样式 */
@@ -876,19 +987,26 @@ watch(() => route.path, () => {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: 12px;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .site-logo-img.collapsed-logo {
-  border-radius: 10px;
+  border-radius: 999px;
 }
 
 .logo-content {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+  transform-origin: left center;
+  transition:
+    opacity 180ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-width 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .logo-text {
@@ -928,7 +1046,17 @@ watch(() => route.path, () => {
   line-height: 48px;
   margin: var(--spacing-1) var(--spacing-3);
   border-radius: var(--radius-md);
-  transition: all var(--duration-normal) var(--easing-ease);
+  transition:
+    width 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    min-width 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 260ms ease,
+    background 200ms ease,
+    color 200ms ease,
+    box-shadow 220ms ease,
+    transform 220ms ease;
   position: relative;
   overflow: hidden;
   display: flex !important;
@@ -962,6 +1090,11 @@ watch(() => route.path, () => {
   gap: 12px;
   padding: 0;
   width: 100%;
+  transition:
+    width 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    gap 260ms ease,
+    justify-content 320ms ease;
 }
 
 .menu-icon {
@@ -973,6 +1106,12 @@ watch(() => route.path, () => {
   flex-shrink: 0;
   font-size: 18px;
   color: inherit;
+  transition:
+    width 260ms ease,
+    height 260ms ease,
+    margin 260ms ease,
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 200ms ease;
 }
 
 .menu-title {
@@ -983,6 +1122,11 @@ watch(() => route.path, () => {
   overflow: hidden;
   text-overflow: ellipsis;
   color: inherit;
+  transform-origin: left center;
+  transition:
+    opacity 180ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-width 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* 子菜单样式 */
@@ -1021,6 +1165,11 @@ watch(() => route.path, () => {
   padding: 0;
   width: 100%;
   margin-left: 24px; /* 子菜单项缩进 */
+  transition:
+    width 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    gap 260ms ease,
+    margin-left 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .submenu-icon {
@@ -1032,6 +1181,12 @@ watch(() => route.path, () => {
   flex-shrink: 0;
   font-size: 14px;
   color: inherit;
+  transition:
+    width 260ms ease,
+    height 260ms ease,
+    margin 260ms ease,
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 200ms ease;
 }
 
 .submenu-title {
@@ -1042,6 +1197,11 @@ watch(() => route.path, () => {
   overflow: hidden;
   text-overflow: ellipsis;
   color: inherit;
+  transform-origin: left center;
+  transition:
+    opacity 180ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-width 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* 现代化顶部导航栏 */
@@ -1853,9 +2013,16 @@ watch(() => route.path, () => {
 .logo-icon {
   background: linear-gradient(135deg, #f7fdff, #e0f5ff 58%, #ecfff9) !important;
   border: 1px solid rgba(255, 255, 255, 0.82);
-  border-radius: 14px !important;
+  border-radius: 999px !important;
   color: var(--color-primary-600) !important;
   box-shadow: 0 12px 28px rgba(21, 122, 177, 0.1) !important;
+  overflow: hidden !important;
+}
+
+.site-logo-img,
+.site-logo-img.collapsed-logo {
+  border-radius: 999px !important;
+  object-fit: contain !important;
 }
 
 .logo-text {
@@ -2137,6 +2304,202 @@ watch(() => route.path, () => {
   background: linear-gradient(135deg, #effcff 0%, #d8f5ff 100%) !important;
   border: 1px solid rgba(24, 185, 236, 0.34) !important;
   box-shadow: 0 10px 24px rgba(24, 185, 236, 0.12) !important;
+}
+
+/* Sidebar transition staging: fade text first, then let Element Plus switch modes. */
+.sidebar.sidebar-animating .logo-content,
+.sidebar.sidebar-collapsing .menu-title,
+.sidebar.sidebar-collapsing .submenu-title {
+  opacity: 0 !important;
+  max-width: 0 !important;
+  transform: translateX(-8px) scale(0.96) !important;
+  pointer-events: none !important;
+}
+
+.sidebar.sidebar-expanding .logo-content,
+.sidebar.sidebar-expanding .menu-title,
+.sidebar.sidebar-expanding .submenu-title {
+  opacity: 1 !important;
+  max-width: 132px !important;
+  transform: translateX(0) scale(1) !important;
+}
+
+.sidebar.sidebar-collapsing .logo {
+  padding: 0 !important;
+  justify-content: center !important;
+}
+
+.sidebar.sidebar-collapsing .logo-container {
+  width: 44px !important;
+  height: 44px !important;
+  gap: 0 !important;
+  justify-content: center !important;
+}
+
+.sidebar.sidebar-collapsing .logo-icon {
+  width: 44px !important;
+  height: 44px !important;
+}
+
+.sidebar.sidebar-collapsing .modern-menu :deep(.el-menu-item),
+.sidebar.sidebar-collapsing .modern-menu :deep(.el-sub-menu__title) {
+  width: 44px !important;
+  min-width: 44px !important;
+  margin: 5px auto !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  transform: none !important;
+}
+
+.sidebar.sidebar-collapsing .modern-menu :deep(.el-sub-menu__icon-arrow),
+.sidebar.sidebar-expanding .modern-menu.el-menu--collapse :deep(.el-sub-menu__icon-arrow) {
+  opacity: 0 !important;
+  transform: translateX(-6px) scale(0.8) !important;
+}
+
+.sidebar.sidebar-collapsing .menu-item-content,
+.sidebar.sidebar-collapsing .submenu-item-content {
+  width: 44px !important;
+  height: 44px !important;
+  gap: 0 !important;
+  margin-left: 0 !important;
+  justify-content: center !important;
+}
+
+.sidebar.sidebar-collapsing .menu-icon,
+.sidebar.sidebar-collapsing .submenu-icon,
+.sidebar.sidebar-expanding .modern-menu.el-menu--collapse .menu-icon,
+.sidebar.sidebar-expanding .modern-menu.el-menu--collapse .submenu-icon {
+  transform: scale(0.96) !important;
+}
+
+.modern-menu.horizontal-collapse-transition {
+  transition:
+    width 140ms ease,
+    opacity 140ms ease !important;
+}
+
+/* Collapsed desktop sidebar: keep the rail visually even and icon-only. */
+.sidebar.sidebar-collapsed {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.sidebar.sidebar-collapsed .logo {
+  height: 82px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+}
+
+.sidebar.sidebar-collapsed .logo-container {
+  width: 44px !important;
+  height: 44px !important;
+  justify-content: center !important;
+}
+
+.sidebar.sidebar-collapsed .logo-icon {
+  width: 44px !important;
+  height: 44px !important;
+}
+
+.sidebar.sidebar-collapsed .site-logo-img.collapsed-logo {
+  width: 44px !important;
+  height: 44px !important;
+  object-fit: cover !important;
+}
+
+.sidebar.sidebar-collapsed .menu-scrollbar {
+  flex: 1 1 auto !important;
+  height: auto !important;
+}
+
+.sidebar.sidebar-collapsed .menu-scrollbar :deep(.el-scrollbar__view) {
+  padding: 14px 0 !important;
+}
+
+.sidebar.sidebar-collapsed .modern-menu {
+  width: 100% !important;
+}
+
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse {
+  width: 100% !important;
+}
+
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.el-menu-item),
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.el-sub-menu__title) {
+  width: 44px !important;
+  min-width: 44px !important;
+  height: 44px !important;
+  line-height: 44px !important;
+  margin: 5px auto !important;
+  padding: 0 !important;
+  border-radius: 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  transform: none !important;
+}
+
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.el-menu-item:hover),
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.el-sub-menu__title:hover),
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.el-menu-item.is-active),
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.el-sub-menu.is-active > .el-sub-menu__title) {
+  transform: none !important;
+}
+
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.el-tooltip),
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.el-tooltip__trigger) {
+  width: 44px !important;
+  height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse .menu-item-content,
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse .submenu-item-content,
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.el-menu-item .menu-item-content),
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.el-sub-menu__title .menu-item-content) {
+  width: 44px !important;
+  height: 44px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse .menu-icon,
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse .submenu-icon,
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.menu-icon),
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.submenu-icon) {
+  width: 22px !important;
+  height: 22px !important;
+  margin: 0 !important;
+  font-size: 18px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.el-icon) {
+  width: 22px !important;
+  height: 22px !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+}
+
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.el-icon svg) {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse :deep(.el-sub-menu__icon-arrow),
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse .menu-title,
+.sidebar.sidebar-collapsed .modern-menu.el-menu--collapse .submenu-title {
+  display: none !important;
 }
 
 /* Mobile layout repair: keep the drawer out of document flow. */

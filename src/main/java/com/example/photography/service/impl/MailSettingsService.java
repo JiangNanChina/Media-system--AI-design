@@ -60,6 +60,10 @@ public class MailSettingsService {
         return getInt(SiteConfig.Keys.MAIL_OVERDUE_REMINDER_INTERVAL_HOURS, 24, 1, 24 * 30);
     }
 
+    public int getLogRetentionDays() {
+        return getInt(SiteConfig.Keys.MAIL_LOG_RETENTION_DAYS, 30, 1, 3650);
+    }
+
     private boolean isConfigured(MailSettings settings) {
         if (!hasRequiredFields(settings)) {
             return false;

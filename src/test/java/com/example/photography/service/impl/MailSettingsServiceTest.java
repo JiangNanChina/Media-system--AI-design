@@ -53,6 +53,14 @@ class MailSettingsServiceTest {
         assertThat(settings.isSmtpSslEnabled()).isTrue();
     }
 
+    @Test
+    void logRetentionDaysFallsBackToDefaultWhenConfigIsInvalid() {
+        when(siteConfigService.getConfigValue(anyString(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
+        when(siteConfigService.getConfigValue(SiteConfig.Keys.MAIL_LOG_RETENTION_DAYS, "30")).thenReturn("0");
+
+        assertThat(service.getLogRetentionDays()).isEqualTo(30);
+    }
+
     private void mockMailConfig(String smtpHost, String qqAccount, String authCode) {
         when(siteConfigService.getConfigValue(anyString(), anyString())).thenAnswer(invocation -> invocation.getArgument(1));
         when(siteConfigService.getConfigValue(SiteConfig.Keys.MAIL_ENABLED, "false")).thenReturn("true");
