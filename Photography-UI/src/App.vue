@@ -1,11 +1,9 @@
 <template>
   <div class="app-container">
     <InteractiveCursor />
+    <RouteTransition />
     <router-view v-slot="{ Component, route }">
-      <transition 
-        :name="getTransitionName(route)" 
-        appear
-      >
+      <transition :name="getTransitionName(route)">
         <component :is="Component" :key="route.path" />
       </transition>
     </router-view>
@@ -13,7 +11,14 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue'
 import InteractiveCursor from '@/components/InteractiveCursor.vue'
+import RouteTransition from '@/components/RouteTransition.vue'
+import { finishInitialRouteTransition } from '@/utils/routeTransition'
+
+onMounted(() => {
+  finishInitialRouteTransition()
+})
 
 // 存储上一个路由路径
 let previousPath = ''
@@ -71,12 +76,12 @@ const getTransitionName = (currentRoute) => {
 /* App容器样式 - 防止白屏 */
 .app-container {
   min-height: 100vh;
-  background: var(--gradient-background);
+  background: #f4f3ef;
   position: relative;
   overflow: hidden;
 }
 
-.app-container::before {
+#app .app-container::before {
   content: '';
   position: absolute;
   top: 0;
@@ -84,24 +89,22 @@ const getTransitionName = (currentRoute) => {
   right: 0;
   bottom: 0;
   background:
-    radial-gradient(circle at 18% 14%, rgba(24, 185, 236, 0.14) 0%, transparent 34%),
-    radial-gradient(circle at 82% 18%, rgba(75, 211, 180, 0.12) 0%, transparent 30%),
-    radial-gradient(circle at 46% 82%, rgba(255, 213, 106, 0.12) 0%, transparent 28%);
+    linear-gradient(rgba(17, 16, 14, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 16, 14, 0.045) 1px, transparent 1px),
+    #f4f3ef;
+  background-size: 34px 34px;
   pointer-events: none;
   z-index: 0;
 }
 
-.app-container::after {
+#app .app-container::after {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background:
-    linear-gradient(rgba(18, 174, 231, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(18, 174, 231, 0.045) 1px, transparent 1px);
-  background-size: 36px 36px;
+  background: linear-gradient(90deg, transparent 49.9%, rgba(17, 16, 14, 0.05) 50%, transparent 50.1%);
   pointer-events: none;
   z-index: 0;
 }
@@ -109,11 +112,11 @@ const getTransitionName = (currentRoute) => {
 /* 页面过渡动画 - 精细化内容切换 */
 /* 登录注册页面专用切换动画 */
 .auth-slide-enter-active {
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 260ms ease-out, transform 260ms ease-out, filter 260ms ease-out;
 }
 
 .auth-slide-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 150ms ease-out, transform 150ms ease-out, filter 150ms ease-out;
 }
 
 .auth-slide-enter-from {
@@ -130,8 +133,13 @@ const getTransitionName = (currentRoute) => {
 
 /* 左滑动画 - 内容区域动画 */
 .slide-left-enter-active,
-.slide-left-leave-active {
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+.slide-right-enter-active {
+  transition: opacity 260ms ease-out, transform 260ms ease-out;
+}
+
+.slide-left-leave-active,
+.slide-right-leave-active {
+  transition: opacity 150ms ease-out, transform 150ms ease-out;
 }
 
 .slide-left-enter-from {
@@ -145,11 +153,6 @@ const getTransitionName = (currentRoute) => {
 }
 
 /* 右滑动画 - 内容区域动画 */
-.slide-right-enter-active,
-.slide-right-leave-active {
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
 .slide-right-enter-from {
   opacity: 0;
   transform: scale(1.02) translateY(-15px);
@@ -161,9 +164,12 @@ const getTransitionName = (currentRoute) => {
 }
 
 /* 淡入淡出动画 - 精细化 */
-.fade-enter-active,
+.fade-enter-active {
+  transition: opacity 220ms ease-out, transform 220ms ease-out, filter 220ms ease-out;
+}
+
 .fade-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity 150ms ease-out, transform 150ms ease-out, filter 150ms ease-out;
 }
 
 .fade-enter-from,
@@ -204,36 +210,16 @@ const getTransitionName = (currentRoute) => {
   pointer-events: none;
 }
 
-/* 简化的内容动画 */
-.auth-slide-enter-active .login-form,
-.auth-slide-enter-active .register-card {
-  animation: contentFadeIn 0.4s ease-out 0.1s both;
-}
-
-.auth-slide-leave-active .login-form,
-.auth-slide-leave-active .register-card {
-  animation: contentFadeOut 0.3s ease-in forwards;
-}
-
-@keyframes contentFadeIn {
-  0% {
-    opacity: 0;
-    transform: translateY(10px) scale(0.98);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes contentFadeOut {
-  0% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-10px) scale(0.98);
+@media (prefers-reduced-motion: reduce) {
+  .auth-slide-enter-active,
+  .auth-slide-leave-active,
+  .slide-left-enter-active,
+  .slide-left-leave-active,
+  .slide-right-enter-active,
+  .slide-right-leave-active,
+  .fade-enter-active,
+  .fade-leave-active {
+    transition-duration: 0.01ms;
   }
 }
 </style>

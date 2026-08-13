@@ -8,6 +8,7 @@ import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 
 import App from './App.vue'
 import routes, { setupRouterGuards } from './router/index.js'
+import { setupRouteTransitions } from './utils/routeTransition.js'
 import './style.css'
 
 const app = createApp(App)
@@ -26,6 +27,7 @@ app.use(pinia)
 app.use(ElementPlus, {
   locale: zhCn,
 })
+setupRouteTransitions(router)
 app.use(router)
 
 import { useUserStore } from '@/stores/user'

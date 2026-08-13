@@ -33,6 +33,16 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+body.route-transition-active {
+  overflow: hidden !important;
+}
+
+body.route-transition-active .interactive-cursor,
+body.route-transition-active .interactive-cursor-dot {
+  opacity: 0 !important;
+  transition: none !important;
+}
+
 button,
 input,
 textarea,
@@ -87,7 +97,7 @@ button,
 /* App surface */
 #app .app-container {
   min-height: 100vh;
-  background: var(--gradient-background) !important;
+  background: #f4f3ef !important;
   position: relative;
   overflow-x: hidden;
 }
@@ -99,9 +109,9 @@ button,
   z-index: 0;
   pointer-events: none;
   background:
-    linear-gradient(rgba(21, 122, 177, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(21, 122, 177, 0.045) 1px, transparent 1px);
-  background-size: 36px 36px;
+    linear-gradient(rgba(17, 16, 14, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 16, 14, 0.045) 1px, transparent 1px);
+  background-size: 34px 34px;
   mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.58), transparent 84%);
 }
 
@@ -111,10 +121,7 @@ button,
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(circle at 14% 12%, rgba(37, 184, 242, 0.1), transparent 28%),
-    radial-gradient(circle at 90% 18%, rgba(98, 214, 189, 0.08), transparent 26%),
-    radial-gradient(circle at 56% 94%, rgba(255, 210, 111, 0.08), transparent 32%);
+  background: linear-gradient(90deg, transparent 49.9%, rgba(17, 16, 14, 0.05) 50%, transparent 50.1%);
 }
 
 #app .app-container > * {
@@ -518,7 +525,7 @@ button,
 }
 
 #app .el-button:active {
-  transform: translateY(0) scale(0.99);
+  transform: translateY(0) scale(0.96);
 }
 
 #app .el-button--primary {

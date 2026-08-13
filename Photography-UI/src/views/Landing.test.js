@@ -126,6 +126,22 @@ describe('Landing public page', () => {
     expect(push).toHaveBeenCalledWith('/dashboard')
   })
 
+  it('opens and closes the mobile navigation without changing routes', async () => {
+    const wrapper = mountLanding()
+    await flushPromises()
+
+    const menuButton = wrapper.find('.nav-menu-button')
+    expect(menuButton.attributes('aria-expanded')).toBe('false')
+
+    await menuButton.trigger('click')
+    expect(wrapper.classes()).toContain('menu-is-open')
+    expect(menuButton.attributes('aria-expanded')).toBe('true')
+
+    await menuButton.trigger('click')
+    expect(wrapper.classes()).not.toContain('menu-is-open')
+    expect(push).not.toHaveBeenCalled()
+  })
+
   it('uses the public landing brand name instead of the management system title', async () => {
     request.get.mockResolvedValueOnce({
       data: {

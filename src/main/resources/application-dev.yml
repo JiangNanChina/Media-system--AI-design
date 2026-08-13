@@ -4,7 +4,7 @@ spring:
       on-profile: dev
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/photography_system?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true}
-    username: ${DB_USERNAME:photography_system}
+    username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:change-me}
 
 jwt:

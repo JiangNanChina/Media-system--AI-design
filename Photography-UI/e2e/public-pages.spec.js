@@ -2,8 +2,11 @@ import { expect, test } from '@playwright/test'
 
 const pages = [
   { path: '/', marker: '.landing-page' },
+  { path: '/join-us', marker: '.join-page' },
   { path: '/login', marker: '.auth-container' },
-  { path: '/submission', marker: '.public-form-page' },
+  { path: '/register', marker: '.auth-container' },
+  { path: '/forgot-password', marker: '.recovery-page' },
+  { path: '/submission', marker: '.submission-page' },
   { path: '/maintenance', marker: '.maintenance-page' }
 ]
 
@@ -11,6 +14,18 @@ for (const width of [375, 768, 1024, 1440]) {
   for (const target of pages) {
     test(`${target.path} has no overflow or text overlap at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: width === 375 ? 812 : 900 })
+      await page.route('**/api/maintenance/public/status', route => route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: {
+            enabled: target.path === '/maintenance',
+            unlocked: false,
+            title: '系统维护中',
+            message: '服务正在维护，请稍后再试。'
+          }
+        })
+      }))
       await page.goto(target.path, { waitUntil: 'networkidle' })
       await expect(page.locator(target.marker)).toBeVisible()
 
