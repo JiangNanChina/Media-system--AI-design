@@ -116,6 +116,7 @@
                   v-model="form.college"
                   size="large"
                   placeholder="请选择学院"
+                  popper-class="join-select-popper"
                   filterable
                   clearable
                   no-data-text="暂无学院，请联系管理员添加"
@@ -137,9 +138,18 @@
               </el-form-item>
 
               <el-form-item label="入学年份" prop="enrollmentYear">
-                <el-select v-model="form.enrollmentYear" size="large" placeholder="请选择入学年份">
+                <el-select
+                  v-model="form.enrollmentYear"
+                  size="large"
+                  placeholder="请选择入学年份"
+                  popper-class="join-select-popper"
+                >
                   <el-option v-for="year in yearOptions" :key="year" :label="year" :value="year" />
                 </el-select>
+              </el-form-item>
+
+              <el-form-item label="班级" prop="className">
+                <el-input v-model.trim="form.className" maxlength="80" size="large" placeholder="请输入班级" />
               </el-form-item>
             </div>
           </section>
@@ -176,32 +186,124 @@
             </header>
 
             <el-form-item label="自我作品（选填）" class="wide-item content-form-item">
-              <el-upload
-                drag
-                :auto-upload="false"
-                :limit="1"
-                :disabled="submitting"
-                accept=".jpg,.jpeg,.png,.gif,.bmp,.webp,.mp4,.mov,.webm,image/jpeg,image/png,image/gif,image/bmp,image/webp,video/mp4,video/quicktime,video/webm"
-                :on-change="selectWork"
-                :on-remove="removeWork"
+              <div
+                class="upload-dropzone"
+                :class="{ 'has-files': selectedEntries.length, 'is-disabled': submitting }"
+                @dragover.prevent
+                @drop.prevent="handleDrop"
               >
-                <el-icon class="upload-icon"><UploadFilled /></el-icon>
-                <div class="el-upload__text">拖拽图片或视频到此处，或点击选择</div>
-                <template #tip>
-                  <span>支持常见图片和 MP4、MOV、WebM，最大 300MB。</span>
-                </template>
-              </el-upload>
-              <div v-if="workMeta" class="selected-file">
-                <el-icon><Files /></el-icon>
-                <span>{{ workMeta.name }}</span>
-                <strong>{{ workMeta.size }}</strong>
-                <FileUploadProgress
-                  v-if="submitting || uploadFailed"
-                  :percentage="progress"
-                  :status="uploadProgressStatus"
-                  subject="作品"
-                  progress-color="#e4b84e"
+                <input
+                  ref="fileInputRef"
+                  class="upload-native-input"
+                  type="file"
+                  multiple
+                  accept=".jpg,.jpeg,.png,.gif,.bmp,.webp,.mp4,.mov,.webm,image/jpeg,image/png,image/gif,image/bmp,image/webp,video/mp4,video/quicktime,video/webm"
+                  @change="handleFileInput"
                 />
+                <input
+                  ref="folderInputRef"
+                  class="upload-native-input"
+                  type="file"
+                  multiple
+                  webkitdirectory
+                  directory
+                  @change="handleFolderInput"
+                />
+
+                <div v-if="!selectedEntries.length" class="upload-empty">
+                  <div class="upload-frame" aria-hidden="true">
+                    <el-icon><Files /></el-icon>
+                  </div>
+                  <div class="upload-empty__copy">
+                    <small>PORTFOLIO / 等待作品</small>
+                    <strong>拖入一个或多个作品</strong>
+                    <span>多个作品或文件夹会自动整理为 ZIP</span>
+                  </div>
+                  <div class="upload-picker-actions">
+                    <el-button class="upload-browse" @click="openFilePicker">
+                      <el-icon><UploadFilled /></el-icon>
+                      <span>选择文件</span>
+                    </el-button>
+                    <el-button class="upload-folder-button" @click="openFolderPicker">
+                      <el-icon><FolderOpened /></el-icon>
+                      <span>选择文件夹</span>
+                    </el-button>
+                  </div>
+                </div>
+
+                <div v-else class="selected-file">
+                  <div class="selected-file__mark" aria-hidden="true">
+                    <el-icon>
+                      <Files v-if="selection.requiresArchive" />
+                      <VideoCamera v-else-if="selectedEntries[0].isVideo" />
+                      <Picture v-else />
+                    </el-icon>
+                    <span>{{ fileCountLabel }}</span>
+                  </div>
+                  <div class="selected-file__body">
+                    <small>{{ selection.requiresArchive ? 'PORTFOLIO READY · ZIP' : `WORK READY · ${selectedEntries[0].extension.toUpperCase()}` }}</small>
+                    <strong :title="selectionTitle">{{ selectionTitle }}</strong>
+                    <div class="selected-file__meta">
+                      <span>{{ selectedEntries.length }} 个文件 · {{ formatUploadSize(selection.totalBytes) }}</span>
+                      <span>{{ selectedFileStatus }}</span>
+                    </div>
+                  </div>
+                  <div v-if="!submitting" class="selected-file__actions">
+                    <el-button class="replace-file-button" @click="openFilePicker">
+                      <el-icon><Plus /></el-icon>
+                      <span>添加文件</span>
+                    </el-button>
+                    <el-button class="folder-file-button" @click="openFolderPicker">
+                      <el-icon><FolderOpened /></el-icon>
+                      <span>添加文件夹</span>
+                    </el-button>
+                    <el-tooltip content="清空全部文件" placement="top">
+                      <el-button
+                        class="remove-file-button"
+                        aria-label="清空全部文件"
+                        @click="clearSelectedWorks"
+                      >
+                        <el-icon><Delete /></el-icon>
+                      </el-button>
+                    </el-tooltip>
+                  </div>
+
+                  <ul class="file-manifest" aria-label="已选择的作品文件">
+                    <li v-for="(entry, index) in selectedEntries" :key="entry.id">
+                      <span class="file-manifest__index">{{ String(index + 1).padStart(2, '0') }}</span>
+                      <span class="file-manifest__info">
+                        <strong :title="entry.path">{{ entry.path }}</strong>
+                        <small>{{ entry.extension.toUpperCase() }} · {{ formatUploadSize(entry.file.size) }}</small>
+                      </span>
+                      <el-tooltip content="移除此文件" placement="top">
+                        <el-button
+                          class="file-manifest__remove"
+                          :aria-label="`移除 ${entry.path}`"
+                          :disabled="submitting"
+                          @click="removeEntry(index)"
+                        >
+                          <el-icon><Close /></el-icon>
+                        </el-button>
+                      </el-tooltip>
+                    </li>
+                  </ul>
+                  <FileUploadProgress
+                    v-if="submitting || uploadFailed"
+                    :percentage="packing ? packingProgress : progress"
+                    :status="uploadProgressStatus"
+                    :subject="selection.requiresArchive ? '作品包' : '作品'"
+                    progress-color="#d84a36"
+                  />
+                </div>
+              </div>
+
+              <div class="upload-specs" aria-label="作品上传要求">
+                <span><strong>FORMAT</strong>JPG · PNG · WebP · MP4 · MOV · WebM</span>
+                <span><strong>CAPACITY</strong>合计最大 300MB · 最多 500 个</span>
+                <span>
+                  <el-icon><Lock /></el-icon>
+                  作品仅用于申请审核
+                </span>
               </div>
             </el-form-item>
           </section>
@@ -212,47 +314,73 @@
               <span>我确认以上信息真实有效，并同意融媒体中心通过 QQ 邮箱或手机号联系我。</span>
             </label>
 
-            <el-button class="submit-button" type="primary" size="large" :loading="submitting" :disabled="!consent" @click="submit">
-              <span>提交申请</span>
+            <el-button class="submit-button" type="primary" size="large" :loading="submitting" :disabled="!consent || submitting" @click="submit">
+              <span>{{ packing ? '正在打包' : submitting ? '正在提交' : '提交申请' }}</span>
               <el-icon><Promotion /></el-icon>
             </el-button>
           </div>
         </el-form>
       </section>
     </main>
+
+    <SubmissionSuccessDialog
+      v-model="successDialogVisible"
+      variant="join"
+      :reference-number="applicationNumber"
+      @confirm="returnHome"
+    />
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import {
   ArrowLeft,
+  Close,
+  Delete,
   Files,
+  FolderOpened,
+  Lock,
   Message,
   Monitor,
   Phone,
+  Picture,
+  Plus,
   Promotion,
   Reading,
   School,
   UploadFilled,
-  User
+  User,
+  VideoCamera
 } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import { getSiteImageUrl } from '@/utils/imageUrl'
 import FileUploadProgress from '@/components/FileUploadProgress.vue'
+import SubmissionSuccessDialog from '@/components/SubmissionSuccessDialog.vue'
 import { getUploadPercentage } from '@/utils/uploadProgress'
+import {
+  createUploadSelection,
+  formatUploadSize,
+  prepareUploadFile
+} from '@/utils/uploadArchive'
 
 const router = useRouter()
 const formRef = ref()
+const fileInputRef = ref()
+const folderInputRef = ref()
 const consent = ref(false)
-const work = ref(null)
+const selection = ref({ entries: [], totalBytes: 0, requiresArchive: false })
 const colleges = ref([])
 const submitting = ref(false)
+const packing = ref(false)
 const uploadFailed = ref(false)
 const progress = ref(0)
+const packingProgress = ref(0)
 const siteLogo = ref('')
+const successDialogVisible = ref(false)
+const applicationNumber = ref('')
 const logoUrl = computed(() => siteLogo.value || '/logo.svg')
 
 const currentYear = new Date().getFullYear()
@@ -269,6 +397,7 @@ const form = reactive({
   college: '',
   major: '',
   enrollmentYear: currentYear,
+  className: '',
   selfIntroduction: ''
 })
 
@@ -283,45 +412,104 @@ const rules = {
   college: [{ required: true, message: '请选择学院', trigger: 'change' }],
   major: [{ required: true, message: '请输入专业', trigger: 'blur' }],
   enrollmentYear: [{ required: true, type: 'number', message: '请选择入学年份', trigger: 'change' }],
+  className: [{ required: true, message: '请输入班级', trigger: 'blur' }],
   selfIntroduction: [{ required: true, message: '请输入自我介绍', trigger: 'blur' }]
 }
 
-const formatFileSize = bytes => {
-  if (!bytes) return '0 MB'
-  const mb = bytes / 1024 / 1024
-  return mb >= 10 ? `${Math.round(mb)} MB` : `${mb.toFixed(1)} MB`
+const workSelectionOptions = {
+  allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'mp4', 'mov', 'webm'],
+  maxBytes: 300 * 1024 * 1024,
+  emptyFileMessage: '不能上传空作品文件',
+  unsupportedMessage: '仅支持 JPG、PNG、GIF、WebP、BMP、MP4、MOV 和 WebM',
+  sizeMessage: '所选作品总大小不能超过300MB'
 }
 
-const workMeta = computed(() => work.value ? {
-  name: work.value.name,
-  size: formatFileSize(work.value.size)
-} : null)
+const selectedEntries = computed(() => selection.value.entries.map(entry => ({
+  ...entry,
+  isVideo: ['mp4', 'mov', 'webm'].includes(entry.extension)
+})))
+const fileCountLabel = computed(() => String(selectedEntries.value.length).padStart(2, '0'))
+const selectionTitle = computed(() => selection.value.requiresArchive
+  ? `${selectedEntries.value.length} 个作品将合并为 ZIP 作品包`
+  : selectedEntries.value[0]?.path || '')
+const selectedFileStatus = computed(() => {
+  if (uploadFailed.value) return '传输中断'
+  if (packing.value) return '正在打包'
+  if (submitting.value) return '正在传输'
+  return selection.value.requiresArchive ? '提交时自动打包' : '等待提交'
+})
 
 const uploadProgressStatus = computed(() => {
+  if (packing.value) return 'packing'
   if (uploadFailed.value) return 'error'
   return progress.value >= 100 ? 'processing' : 'uploading'
 })
 
-const selectWork = uploadFile => {
+const applyFiles = files => {
+  if (submitting.value || !files?.length) return
   uploadFailed.value = false
   progress.value = 0
-  if (uploadFile.raw.size > 300 * 1024 * 1024) {
-    ElMessage.error('作品文件不能超过300MB')
-    work.value = null
-    return
+  packingProgress.value = 0
+
+  try {
+    const combinedFiles = [
+      ...selection.value.entries.map(entry => entry.file),
+      ...Array.from(files)
+    ]
+    selection.value = createUploadSelection(combinedFiles, workSelectionOptions)
+  } catch (error) {
+    ElMessage.error(error.message)
   }
-  if (!/\.(jpg|jpeg|png|gif|bmp|webp|mp4|mov|webm)$/i.test(uploadFile.name)) {
-    ElMessage.error('仅支持图片和 MP4、MOV、WebM 视频')
-    work.value = null
-    return
-  }
-  work.value = uploadFile.raw
 }
 
-const removeWork = () => {
-  work.value = null
+const resetNativeInput = event => {
+  if (event?.target) event.target.value = ''
+}
+
+const handleFileInput = event => {
+  applyFiles(event.target.files)
+  resetNativeInput(event)
+}
+
+const handleFolderInput = event => {
+  applyFiles(event.target.files)
+  resetNativeInput(event)
+}
+
+const handleDrop = event => {
+  if (submitting.value) return
+  const containsFolder = Array.from(event.dataTransfer?.items || [])
+    .some(item => item.webkitGetAsEntry?.()?.isDirectory)
+  if (containsFolder) {
+    ElMessage.warning('拖入文件夹时浏览器无法稳定读取目录，请使用“选择文件夹”')
+    return
+  }
+  applyFiles(event.dataTransfer?.files)
+}
+
+const clearSelectedWorks = () => {
+  selection.value = { entries: [], totalBytes: 0, requiresArchive: false }
   uploadFailed.value = false
   progress.value = 0
+  packingProgress.value = 0
+}
+
+const removeEntry = index => {
+  const remainingFiles = selection.value.entries
+    .filter((_entry, entryIndex) => entryIndex !== index)
+    .map(entry => entry.file)
+  selection.value = createUploadSelection(remainingFiles, workSelectionOptions)
+  uploadFailed.value = false
+  progress.value = 0
+  packingProgress.value = 0
+}
+
+const openFilePicker = () => {
+  if (!submitting.value) fileInputRef.value?.click()
+}
+
+const openFolderPicker = () => {
+  if (!submitting.value) folderInputRef.value?.click()
 }
 
 const fetchColleges = async () => {
@@ -349,15 +537,26 @@ const submit = async () => {
     return
   }
 
-  const data = new FormData()
-  Object.entries(form).forEach(([key, value]) => data.append(key, value ?? ''))
-  if (work.value) data.append('work', work.value)
-
   submitting.value = true
+  packing.value = selection.value.requiresArchive
   uploadFailed.value = false
   progress.value = 0
+  packingProgress.value = 0
   let response
+  let requestStarted = false
   try {
+    const uploadFile = await prepareUploadFile(selection.value, {
+      archiveBaseName: 'join-portfolio',
+      maxBytes: workSelectionOptions.maxBytes,
+      onProgress: percentage => { packingProgress.value = percentage }
+    })
+    packing.value = false
+
+    const data = new FormData()
+    Object.entries(form).forEach(([key, value]) => data.append(key, value ?? ''))
+    if (uploadFile) data.append('work', uploadFile)
+
+    requestStarted = true
     response = await request.post('/join-applications/public', data, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 10 * 60 * 1000,
@@ -367,18 +566,20 @@ const submit = async () => {
       }
     })
     progress.value = 100
-  } catch {
-    uploadFailed.value = true
+  } catch (error) {
+    if (requestStarted) uploadFailed.value = true
+    else ElMessage.error(error.message || '作品打包失败，请重试')
     return
   } finally {
+    packing.value = false
     submitting.value = false
   }
 
-  await ElMessageBox.alert(`申请编号：${response.data.applicationNumber}`, '申请已提交', {
-    confirmButtonText: '返回首页'
-  })
-  router.push('/')
+  applicationNumber.value = response.data.applicationNumber
+  successDialogVisible.value = true
 }
+
+const returnHome = () => router.push('/')
 
 onMounted(async () => {
   fetchColleges()

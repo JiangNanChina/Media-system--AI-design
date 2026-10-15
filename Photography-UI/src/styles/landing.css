@@ -260,7 +260,8 @@
   position: relative;
   display: flex;
   align-items: flex-end;
-  min-height: min(820px, calc(100svh - 34px));
+  min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
   color: var(--landing-white);
   background: var(--landing-ink);
@@ -1442,10 +1443,6 @@ a.contact-item:hover {
     width: fit-content;
   }
 
-  .hero {
-    min-height: min(780px, calc(100svh - 28px));
-  }
-
   .hero-frame {
     top: 104px;
     right: 24px;
@@ -1515,10 +1512,6 @@ a.contact-item:hover {
 
   .nav-panel nav {
     grid-template-columns: 1fr 1fr;
-  }
-
-  .hero {
-    min-height: calc(100svh - 24px);
   }
 
   .hero-frame {

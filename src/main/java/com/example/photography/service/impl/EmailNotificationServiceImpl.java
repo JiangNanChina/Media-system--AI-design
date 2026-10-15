@@ -1,5 +1,6 @@
 package com.example.photography.service.impl;
 
+import com.example.photography.service.EmailTemplateRenderer;
 import com.example.photography.model.entity.BorrowRecord;
 import com.example.photography.model.entity.CheckinConfiguration;
 import com.example.photography.model.entity.DutySchedule;
@@ -365,7 +366,6 @@ public class EmailNotificationServiceImpl implements EmailNotificationService {
             candidates.addAll(userRepository.findByRoleAndDeletedFalse(UserRole.DIRECTOR));
         }
         candidates.addAll(userRepository.findByRoleAndDeletedFalse(UserRole.SUPER_ADMIN));
-        candidates.addAll(userRepository.findByRoleAndDeletedFalse(UserRole.ADMIN));
         return filterApprovers(candidates, applicantId);
     }
 

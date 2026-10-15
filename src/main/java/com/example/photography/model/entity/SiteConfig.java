@@ -219,8 +219,10 @@ public class SiteConfig extends BaseEntity {
         public static final String LANDING_NAV_FEATURES_LABEL = "landing.nav.features_label";
         public static final String LANDING_NAV_SHOWCASE_LABEL = "landing.nav.showcase_label";
         public static final String LANDING_NAV_SUBMISSION_LABEL = "landing.nav.submission_label";
+        public static final String LANDING_NAV_JOIN_LABEL = "landing.nav.join_label";
         public static final String LANDING_HERO_BADGE = "landing.hero.badge";
         public static final String LANDING_HERO_PRIMARY_CTA = "landing.hero.primary_cta";
+        public static final String LANDING_HERO_JOIN_CTA = "landing.hero.join_cta";
         public static final String LANDING_HERO_SECONDARY_CTA = "landing.hero.secondary_cta";
         public static final String LANDING_FEATURES_EYEBROW = "landing.features.eyebrow";
         public static final String LANDING_FEATURES_TITLE = "landing.features.title";

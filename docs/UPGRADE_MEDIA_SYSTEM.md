@@ -13,7 +13,14 @@
 
 ```bash
 mysql photography_system < docs/migration/001_media_system_schema_mysql8.sql
+mysql photography_system < docs/migration/007_add_user_roles_mysql57_mysql8.sql
+mysql photography_system < docs/migration/008_add_device_hardware_fingerprint_mysql57_mysql8.sql
 ```
+
+`007_add_user_roles_mysql57_mysql8.sql` 同时兼容 MySQL 5.7 和 8.x。它会保留
+`users.role` 作为最高角色兼容字段，并把现有单角色数据回填到 `user_roles`。
+生产配置使用 `ddl-auto: validate`，因此必须在启动新版本后端之前执行 `007` 和 `008`；
+否则 Hibernate 会因缺少角色表或设备硬件指纹列而中止启动。
 
 确认业务历史允许清空后，再显式执行清理脚本：
 
@@ -29,9 +36,8 @@ mysql --init-command="SET @CONFIRM_MEDIA_HISTORY_CLEANUP='YES'" photography_syst
 2. 检查日志中没有密码、SMTP 授权码或令牌内容。
 3. 由超级管理员重新填写 QQ SMTP 授权码；旧明文授权码不会迁移。
 4. 配置落地页校园视频/图片、校园特色、部门风采、抖音与微信链接。
-5. 验证超级管理员、主任、部长、指导老师和部员的权限矩阵后再开放访问。
+5. 验证角色多选、角色筛选，以及超级管理员、主任、部长、指导老师和部员的权限矩阵后再开放访问。
 
 ## 回滚
 
 停止新版本，恢复升级前数据库以及 `uploads/`、`private-uploads/` 的同一时间点备份，然后部署原版本。不要只回滚数据库或文件系统其中之一。
-

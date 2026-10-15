@@ -1,10 +1,13 @@
 package com.example.photography.config;
 
+import com.example.photography.PhotographyApplication;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+
+import java.util.TimeZone;
 
 /**
  * Jackson配置类
@@ -17,6 +20,7 @@ public class JacksonConfig {
     @Primary
     public ObjectMapper objectMapper() {
         ObjectMapper mapper = new ObjectMapper();
+        mapper.setTimeZone(TimeZone.getTimeZone(PhotographyApplication.APPLICATION_TIME_ZONE));
         
         // 注册Java时间模块
         mapper.registerModule(new JavaTimeModule());

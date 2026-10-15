@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(100) NULL,
     phone VARCHAR(20) NULL,
     avatar_url VARCHAR(500) NULL,
-    role ENUM('MEMBER','MINISTER','DIRECTOR','ADVISOR','SUPER_ADMIN','ADMIN') NOT NULL DEFAULT 'MEMBER',
+    role VARCHAR(20) NOT NULL DEFAULT 'MEMBER' COMMENT '兼容字段：用户当前最高角色',
     enabled BIT(1) NOT NULL DEFAULT b'1',
     account_status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
     failed_login_attempts INT NOT NULL DEFAULT 0,
@@ -51,6 +51,35 @@ CREATE TABLE IF NOT EXISTS users (
     CONSTRAINT fk_users_department
         FOREIGN KEY (department_id) REFERENCES departments (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户';
+
+-- 兼容旧版本的 ENUM/短列定义；生产 validate 要求与实体的 VARCHAR(20) 一致。
+ALTER TABLE users
+    MODIFY COLUMN role VARCHAR(20) NOT NULL DEFAULT 'MEMBER' COMMENT '兼容字段：用户当前最高角色';
+
+UPDATE users
+SET role = 'SUPER_ADMIN'
+WHERE role = 'ADMIN';
+
+CREATE TABLE IF NOT EXISTS user_roles (
+    user_id BIGINT NOT NULL,
+    role VARCHAR(20) NOT NULL,
+    PRIMARY KEY (user_id, role),
+    KEY idx_user_roles_role (role),
+    CONSTRAINT fk_user_roles_user
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户角色集合';
+
+-- 规范化曾经执行过早期多角色迁移的数据库，并规避主键冲突。
+DELETE legacy_role
+FROM user_roles legacy_role
+JOIN user_roles canonical_role
+  ON canonical_role.user_id = legacy_role.user_id
+ AND canonical_role.role = 'SUPER_ADMIN'
+WHERE legacy_role.role = 'ADMIN';
+
+UPDATE user_roles
+SET role = 'SUPER_ADMIN'
+WHERE role = 'ADMIN';
 
 -- ============================================================
 -- 设备与借用
@@ -450,6 +479,7 @@ CREATE TABLE IF NOT EXISTS user_devices (
     id BIGINT NOT NULL AUTO_INCREMENT,
     user_id BIGINT NOT NULL,
     device_fingerprint VARCHAR(500) NOT NULL,
+    hardware_fingerprint VARCHAR(128) NULL,
     device_name VARCHAR(200) NULL,
     device_type ENUM('MOBILE','TABLET','DESKTOP','UNKNOWN') NOT NULL,
     os_info VARCHAR(200) NULL,
@@ -468,6 +498,7 @@ CREATE TABLE IF NOT EXISTS user_devices (
     PRIMARY KEY (id),
     KEY idx_user_devices_user_id (user_id),
     KEY idx_user_devices_fingerprint (device_fingerprint(191)),
+    KEY idx_user_devices_hardware_fingerprint (hardware_fingerprint),
     KEY idx_user_devices_active (is_active, bind_status),
     KEY idx_user_devices_last_active_at (last_active_at),
     CONSTRAINT fk_user_devices_user
@@ -602,6 +633,10 @@ ON DUPLICATE KEY UPDATE
     locked_until = NULL,
     token_version = token_version + 1,
     updated_at = CURRENT_TIMESTAMP;
+
+INSERT IGNORE INTO user_roles (user_id, role)
+SELECT id, role
+FROM users;
 
 INSERT INTO site_configs (
     config_key, config_value, description, config_type, enabled, sort_order, deleted

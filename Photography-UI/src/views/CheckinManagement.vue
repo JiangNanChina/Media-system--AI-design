@@ -227,7 +227,8 @@
     <el-dialog
       v-model="showCheckinDialog"
       title="签到"
-      :width="isMobile ? '95%' : '500px'"
+      width="min(760px, 94vw)"
+      class="checkin-dialog-shell"
       center
     >
       <CheckinDialog
@@ -484,6 +485,22 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+:global(.checkin-dialog-shell) {
+  display: flex;
+  flex-direction: column;
+  max-height: 92vh;
+}
+
+:global(.checkin-dialog-shell .el-dialog__header) {
+  flex: 0 0 auto;
+}
+
+:global(.checkin-dialog-shell .el-dialog__body) {
+  min-height: 0;
+  padding: var(--spacing-5) var(--spacing-6) var(--spacing-6);
+  overflow-y: auto;
+}
+
 .checkin-management {
   padding: 24px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

@@ -2,6 +2,7 @@ package com.example.photography.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -16,6 +17,11 @@ public class DeviceInfoRequest {
     @Size(max = 500, message = "设备指纹长度不能超过500字符")
     @Schema(description = "设备指纹（唯一标识）", required = true)
     private String deviceFingerprint;
+
+    @Size(max = 128, message = "设备硬件特征长度不能超过128字符")
+    @Pattern(regexp = "^hardware_v1_[0-9a-f]{64}$", message = "设备硬件特征格式不正确")
+    @Schema(description = "不包含浏览器版本等易变信息的设备特征摘要")
+    private String hardwareFingerprint;
     
     @Size(max = 200, message = "设备名称长度不能超过200字符")
     @Schema(description = "设备名称")

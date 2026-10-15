@@ -1,6 +1,14 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import request from '@/utils/request'
+import {
+  getGrantedRoles,
+  getHighestRole,
+  getHighestRoles,
+  getUserRoles,
+  hasAnyGrantedRole,
+  roleLabel
+} from '@/utils/userRoles'
 
 const parseJwt = (token) => {
   try {
@@ -18,23 +26,24 @@ const isTokenExpired = (token) => {
   return !payload?.exp || Date.now() >= payload.exp * 1000 - 30_000
 }
 
+const normalizeUserInfo = value => {
+  if (!value) return null
+  const roles = getUserRoles(value)
+  return {
+    ...value,
+    roles,
+    role: getHighestRole(roles)
+  }
+}
+
 const readUserInfo = () => {
   try {
     const value = localStorage.getItem('userInfo')
-    return value ? JSON.parse(value) : null
+    return value ? normalizeUserInfo(JSON.parse(value)) : null
   } catch {
     localStorage.removeItem('userInfo')
     return null
   }
-}
-
-const roleLabels = {
-  MEMBER: '部员',
-  MINISTER: '部长',
-  DIRECTOR: '主任',
-  ADVISOR: '指导老师',
-  SUPER_ADMIN: '系统超级管理员',
-  ADMIN: '管理员'
 }
 
 export const useUserStore = defineStore('user', () => {
@@ -42,31 +51,38 @@ export const useUserStore = defineStore('user', () => {
   const userInfo = ref(readUserInfo())
   const restoring = ref(false)
 
-  const role = computed(() => userInfo.value?.role || '')
+  const roles = computed(() => getUserRoles(userInfo.value))
+  const highestRoles = computed(() => getHighestRoles(roles.value))
+  const grantedRoles = computed(() => getGrantedRoles(roles.value))
+  const role = computed(() => getHighestRole(roles.value))
   const isLoggedIn = computed(() => Boolean(token.value) && !isTokenExpired(token.value))
-  const isSuperAdmin = computed(() => ['SUPER_ADMIN', 'ADMIN'].includes(role.value))
-  const isDirector = computed(() => role.value === 'DIRECTOR')
-  const isMinister = computed(() => role.value === 'MINISTER')
-  const canManageBusiness = computed(() => isMinister.value || isDirector.value || isSuperAdmin.value)
-  const canManageUsers = computed(() => isDirector.value || isSuperAdmin.value)
-  const canManageSite = computed(() => isSuperAdmin.value)
+  const hasAnyRole = requiredRoles => hasAnyGrantedRole(roles.value, requiredRoles)
+  const hasRole = requiredRole => hasAnyRole([requiredRole])
+  const isSuperAdmin = computed(() => highestRoles.value.includes('SUPER_ADMIN'))
+  const isDirector = computed(() => highestRoles.value.includes('DIRECTOR'))
+  const isMinister = computed(() => highestRoles.value.includes('MINISTER'))
+  const isAdvisor = computed(() => highestRoles.value.includes('ADVISOR'))
+  const canManageBusiness = computed(() => hasRole('MINISTER'))
+  const canManageUsers = computed(() => hasRole('DIRECTOR'))
+  const canManageSite = computed(() => hasRole('SUPER_ADMIN'))
   const isAdmin = computed(() => canManageBusiness.value)
   const userName = computed(() => userInfo.value?.realName || userInfo.value?.username || '')
-  const userRole = computed(() => roleLabels[role.value] || '成员')
+  const userRole = computed(() => highestRoles.value.map(roleLabel).join(' / ') || '部员')
 
   const applyLoginData = (data, explicitLogin = false) => {
     token.value = data.token || ''
-    userInfo.value = {
+    userInfo.value = normalizeUserInfo({
       id: data.userId,
       username: data.username,
       realName: data.realName,
       email: data.email,
+      roles: data.roles,
       role: data.role,
       departmentName: data.departmentName,
       avatar: data.avatarUrl,
       accountStatus: data.accountStatus,
       createdAt: data.createdAt
-    }
+    })
     localStorage.setItem('userInfo', JSON.stringify(userInfo.value))
     if (explicitLogin && data.loginSessionId) {
       sessionStorage.setItem('loginSessionId', data.loginSessionId)
@@ -83,7 +99,9 @@ export const useUserStore = defineStore('user', () => {
 
   const login = async (form) => {
     try {
-      const response = await request.post('/auth/login', form, { skipAuthRefresh: true })
+      // Login owns the user-facing failure message; keep the request interceptor quiet
+      // so a rejected login is not announced a second time.
+      const response = await request.post('/auth/login', form, { skipAuthRefresh: true, silent: true })
       applyLoginData(response.data, true)
       return { success: true, data: response.data }
     } catch (error) {
@@ -124,7 +142,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   const updateUserInfo = (value) => {
-    userInfo.value = { ...userInfo.value, ...value }
+    userInfo.value = normalizeUserInfo({ ...userInfo.value, ...value })
     localStorage.setItem('userInfo', JSON.stringify(userInfo.value))
   }
 
@@ -134,8 +152,9 @@ export const useUserStore = defineStore('user', () => {
   }
 
   return {
-    token, userInfo, restoring, role, isLoggedIn, isAdmin, isSuperAdmin, isDirector, isMinister,
-    canManageBusiness, canManageUsers, canManageSite, userName, userRole,
+    token, userInfo, restoring, roles, highestRoles, grantedRoles, role, isLoggedIn,
+    isAdmin, isSuperAdmin, isDirector, isMinister, isAdvisor,
+    canManageBusiness, canManageUsers, canManageSite, userName, userRole, hasRole, hasAnyRole,
     login, logout, restoreSession, clearSession, checkTokenValidity, updateUserInfo, refreshUserInfo
   }
 })

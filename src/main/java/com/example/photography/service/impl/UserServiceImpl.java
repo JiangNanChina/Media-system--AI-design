@@ -23,8 +23,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -139,7 +142,7 @@ public class UserServiceImpl implements UserService {
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
 
-        user.setRole(request.getRole());
+        user.setRoles(validateRoles(request.getRequestedRoles()));
         
         // 设置部门
         if (request.getDepartmentId() != null) {
@@ -177,7 +180,8 @@ public class UserServiceImpl implements UserService {
         user.setEmail(request.getEmail());
         user.setPhone(request.getPhone());
 
-        user.setRole(request.getRole());
+        Set<UserRole> previousRoles = user.getRoles();
+        user.setRoles(validateRoles(request.getRequestedRoles()));
         
         // 更新密码（如果提供）
         if (StringUtils.hasText(request.getPassword())) {
@@ -194,7 +198,9 @@ public class UserServiceImpl implements UserService {
             user.setDepartment(null);
         }
         
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        revokeSessionsIfRolesChanged(saved, previousRoles);
+        return saved;
     }
     
     @Override
@@ -232,8 +238,10 @@ public class UserServiceImpl implements UserService {
             user.setAvatarUrl(request.getAvatarUrl());
         }
         
-        if (request.getRole() != null) {
-            user.setRole(request.getRole());
+        Set<UserRole> previousRoles = user.getRoles();
+        Set<UserRole> requestedRoles = request.getRequestedRoles();
+        if (requestedRoles != null) {
+            user.setRoles(validateRoles(requestedRoles));
         }
         
         if (request.getEnabled() != null) {
@@ -253,7 +261,9 @@ public class UserServiceImpl implements UserService {
             user.setDepartment(department);
         }
         
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        revokeSessionsIfRolesChanged(saved, previousRoles);
+        return saved;
     }
     
     @Override
@@ -347,18 +357,18 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public Page<User> searchUsersWithFilters(String keyword, UserRole role, Long departmentId, Boolean enabled, Pageable pageable) {
-        return userRepository.searchUsersWithFilters(keyword, role, departmentId, enabled, pageable);
+        return userRepository.searchUsersWithFilters(keyword, role == null ? null : role.normalized(), departmentId, enabled, pageable);
     }
     
     @Override
     @Transactional(readOnly = true)
     public List<User> findByRole(UserRole role) {
-        return userRepository.findByRoleAndDeletedFalse(role);
+        return userRepository.findByRoleAndDeletedFalse(role.normalized());
     }
     
     @Override
     public List<User> findByRoleWithDepartment(UserRole role) {
-        return userRepository.findByRoleWithDepartment(role);
+        return userRepository.findByRoleWithDepartment(role.normalized());
     }
     
     @Override
@@ -500,7 +510,7 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public UserStatistics getUserStatistics() {
         long totalUsers = userRepository.countByDeletedFalse();
-        long adminCount = userRepository.countByRoleAndDeletedFalse(UserRole.ADMIN);
+        long adminCount = userRepository.countByRoleAndDeletedFalse(UserRole.SUPER_ADMIN);
         long memberCount = userRepository.countByRoleAndDeletedFalse(UserRole.MEMBER);
         
         // 这里可以添加更复杂的活跃用户统计逻辑
@@ -512,5 +522,27 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<User> getAllActiveUsers() {
         return userRepository.findByEnabledTrueAndDeletedFalseOrderByRealNameAsc();
+    }
+
+    private Set<UserRole> validateRoles(Set<UserRole> roles) {
+        if (roles == null || roles.isEmpty()) {
+            throw new IllegalArgumentException("请至少选择一个角色");
+        }
+        if (roles.stream().anyMatch(Objects::isNull)) {
+            throw new IllegalArgumentException("角色不能为空");
+        }
+        if (roles.contains(UserRole.ADMIN)) {
+            throw new IllegalArgumentException("请使用SUPER_ADMIN身份");
+        }
+        return new LinkedHashSet<>(UserRole.normalize(roles));
+    }
+
+    private void revokeSessionsIfRolesChanged(User user, Set<UserRole> previousRoles) {
+        if (previousRoles.equals(user.getRoles())) {
+            return;
+        }
+        user.setTokenVersion((user.getTokenVersion() == null ? 0 : user.getTokenVersion()) + 1);
+        userRepository.save(user);
+        refreshTokenService.revokeAll(user.getId());
     }
 }

@@ -4,6 +4,9 @@ import com.example.photography.model.enums.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 /**
  * 用户更新请求DTO
  */
@@ -25,6 +28,8 @@ public class UserUpdateRequest {
     private String avatarUrl;
     
     private UserRole role;
+
+    private Set<UserRole> roles;
     
     private Long departmentId;
     
@@ -88,6 +93,21 @@ public class UserUpdateRequest {
     
     public void setRole(UserRole role) {
         this.role = role;
+    }
+
+    public Set<UserRole> getRoles() {
+        return roles;
+    }
+
+    public void setRoles(Set<UserRole> roles) {
+        this.roles = roles;
+    }
+
+    public Set<UserRole> getRequestedRoles() {
+        if (roles != null) {
+            return new LinkedHashSet<>(roles);
+        }
+        return role == null ? null : new LinkedHashSet<>(Set.of(role));
     }
     
     public Long getDepartmentId() {

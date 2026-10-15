@@ -7,28 +7,69 @@
     <meta name="description" content="融媒体摄影设备借还管理系统" />
     <meta name="keywords" content="摄影设备,借还管理,融媒体,设备管理" />
     <title>融媒体设备管理系统</title>
+    <script>
+      (() => {
+        const archivePaths = new Set(['/', '/join-us', '/submission', '/login', '/register', '/forgot-password'])
+        const normalizedPath = window.location.pathname.replace(/\/+$/, '') || '/'
+        document.documentElement.dataset.routeBootTheme = archivePaths.has(normalizedPath) ? 'archive' : 'admin'
+      })()
+    </script>
     <style>
-      html, body { margin: 0; min-width: 320px; min-height: 100%; background: #11100e; }
-      .route-boot-loader { position: fixed; z-index: 2147483000; inset: 0; display: grid; place-items: center; min-height: 100vh; color: #f4f3ef; background: #11100e; font-family: "Microsoft YaHei", sans-serif; }
-      .route-boot-loader::before { content: ""; position: absolute; inset: 0; background: linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px); background-size: 34px 34px; }
-      .route-boot-frame { position: relative; display: grid; justify-items: center; gap: 18px; width: min(390px, 84vw); }
+      html, body { margin: 0; min-width: 320px; min-height: 100%; background: #f6fbff; }
+      html[data-route-boot-theme="archive"], html[data-route-boot-theme="archive"] body { background: #11100e; }
+      .route-boot-loader { position: fixed; z-index: 2147483000; inset: 0; min-height: 100vh; }
+      .route-boot-loader--admin { display: grid; place-items: center; padding: 24px; box-sizing: border-box; overflow: hidden; color: #12384f; background: linear-gradient(135deg, #fbfdff, #edf8ff 46%, #fbfff8); font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif; }
+      .route-boot-loader--admin::before { content: ""; position: absolute; inset: 0; background: linear-gradient(rgba(37,184,242,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(37,184,242,.035) 1px, transparent 1px); background-size: 48px 48px; -webkit-mask-image: radial-gradient(circle at center, #000, transparent 72%); mask-image: radial-gradient(circle at center, #000, transparent 72%); }
+      .route-boot-frame { position: relative; display: grid; justify-items: center; width: min(360px, calc(100vw - 40px)); padding: 32px 32px 24px; box-sizing: border-box; background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(247,253,255,.88)); border: 1px solid rgba(255,255,255,.82); border-radius: 22px; box-shadow: 0 24px 70px rgba(21,122,177,.14), inset 0 1px 0 rgba(255,255,255,.92); }
+      .route-boot-frame::after { content: ""; position: absolute; inset: 0; border: 1px solid rgba(135,185,214,.2); border-radius: inherit; pointer-events: none; }
+      .route-boot-mark { position: relative; width: 88px; height: 88px; margin-bottom: 20px; }
+      .route-boot-ring, .route-boot-icon { position: absolute; border-radius: 50%; }
+      .route-boot-ring { inset: 0; border: 2px solid rgba(37,184,242,.12); border-top-color: #159ee5; border-right-color: rgba(53,199,163,.68); animation: boot-spin 900ms linear infinite; }
+      .route-boot-icon { inset: 17px; display: grid; place-items: center; color: #087fc4; background: linear-gradient(145deg, #f7fdff, #e0f5ff 58%, #ecfff9); border: 1px solid rgba(37,184,242,.22); box-shadow: 0 10px 24px rgba(21,122,177,.12); }
+      .route-boot-icon img { width: 30px; height: 30px; object-fit: contain; }
+      .route-boot-frame strong { color: #12384f; font-size: 20px; font-weight: 800; line-height: 1.3; letter-spacing: 0; }
+      .route-boot-frame small { margin-top: 7px; color: #4f6d82; font-size: 13px; font-weight: 500; letter-spacing: 0; }
+      .route-boot-progress { width: 100%; height: 4px; margin-top: 22px; overflow: hidden; background: rgba(135,185,214,.2); border-radius: 999px; }
+      .route-boot-progress span { display: block; width: 46%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #159ee5, #35c7a3); animation: boot-progress 1.05s cubic-bezier(.65,0,.35,1) infinite; }
+      .route-boot-status { display: inline-flex; align-items: center; gap: 8px; margin-top: 13px; color: #7691a4; font-size: 12px; font-weight: 600; }
+      .route-boot-status i { width: 6px; height: 6px; background: #35c7a3; border-radius: 50%; box-shadow: 0 0 0 4px rgba(53,199,163,.12); }
+      .route-boot-loader--archive { display: grid; place-items: center; color: #f4f3ef; background: #11100e; font-family: "Microsoft YaHei", sans-serif; }
+      .route-boot-loader--archive::before { content: ""; position: absolute; inset: 0; background: linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px); background-size: 34px 34px; }
+      .route-boot-archive-frame { position: relative; display: grid; justify-items: center; gap: 18px; width: min(390px, 84vw); }
       .route-boot-gate { position: relative; width: 100%; height: 150px; background: linear-gradient(rgba(255,255,255,.075) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.075) 1px, transparent 1px), #151412; background-size: 28px 28px; border: 1px solid rgba(255,255,255,.3); }
       .route-boot-gate::before, .route-boot-gate::after { content: ""; position: absolute; width: 24px; height: 24px; }
       .route-boot-gate::before { top: 12px; left: 12px; border-top: 2px solid #e4b84e; border-left: 2px solid #e4b84e; }
       .route-boot-gate::after { right: 12px; bottom: 12px; border-right: 2px solid #e4b84e; border-bottom: 2px solid #e4b84e; }
       .route-boot-scan { position: absolute; top: 0; bottom: 0; left: -20%; width: 18%; background: #d84a36; opacity: .82; animation: boot-scan 760ms cubic-bezier(.65,0,.35,1) infinite; }
-      .route-boot-frame strong { font: 900 clamp(24px, 4vw, 36px)/1.1 "Arial Black", "Microsoft YaHei", sans-serif; }
-      .route-boot-frame small { color: #d84a36; font: 700 9px/1 Consolas, monospace; }
+      .route-boot-archive-frame strong { font: 900 clamp(24px, 4vw, 36px)/1.1 "Arial Black", "Microsoft YaHei", sans-serif; }
+      .route-boot-archive-frame small { color: #d84a36; font: 700 9px/1 Consolas, monospace; }
+      html[data-route-boot-theme="admin"] .route-boot-loader--archive,
+      html[data-route-boot-theme="archive"] .route-boot-loader--admin { display: none; }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+      @keyframes boot-progress { 0% { transform: translateX(-105%); } 62%, 100% { transform: translateX(225%); } }
       @keyframes boot-scan { 0% { left: -20%; } 55%, 100% { left: 103%; } }
-      @media (prefers-reduced-motion: reduce) { .route-boot-scan { left: 41%; animation: none; } }
+      @media (max-width: 520px) { .route-boot-frame { padding: 28px 24px 22px; } }
+      @media (prefers-reduced-motion: reduce) { .route-boot-ring, .route-boot-progress span, .route-boot-scan { animation: none; } .route-boot-progress span { width: 62%; } .route-boot-scan { left: 41%; } }
     </style>
     <!-- 高德地图API - 动态加载，此行仅作为备用 -->
     <!-- <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=YOUR_AMAP_API_KEY&plugin=AMap.Geolocation,AMap.PlaceSearch,AMap.Geocoder"></script> -->
   </head>
   <body>
     <div id="app">
-      <div class="route-boot-loader" role="status" aria-label="应用加载中">
+      <div class="route-boot-loader route-boot-loader--admin" role="status" aria-label="应用加载中">
         <div class="route-boot-frame">
+          <div class="route-boot-mark" aria-hidden="true">
+            <span class="route-boot-ring"></span>
+            <span class="route-boot-icon"><img src="/logo.svg" alt="" /></span>
+          </div>
+          <strong>融媒体管理系统</strong>
+          <small>系统加载中，请稍候</small>
+          <div class="route-boot-progress" aria-hidden="true"><span></span></div>
+          <div class="route-boot-status" aria-hidden="true"><i></i><span>正在初始化系统</span></div>
+        </div>
+      </div>
+      <div class="route-boot-loader route-boot-loader--archive" role="status" aria-label="应用加载中">
+        <div class="route-boot-archive-frame">
           <div class="route-boot-gate"><span class="route-boot-scan"></span></div>
           <small>MEDIA ARCHIVE / INITIALIZING</small>
           <strong>正在装载画面</strong>

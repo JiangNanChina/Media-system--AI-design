@@ -6,6 +6,7 @@ import com.example.photography.dto.response.CheckinResponse;
 import com.example.photography.model.entity.*;
 import com.example.photography.repository.*;
 import com.example.photography.service.CheckinService;
+import com.example.photography.service.DynamicQrCodeService;
 import com.example.photography.utils.CheckinWeekdayUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,7 +42,7 @@ public class CheckinServiceImpl implements CheckinService {
     private UserRepository userRepository;
 
     @Autowired
-    private CheckinDeviceUsageRepository checkinDeviceUsageRepository;
+    private DynamicQrCodeService dynamicQrCodeService;
     
     private final ObjectMapper objectMapper = new ObjectMapper();
     
@@ -195,8 +196,6 @@ public class CheckinServiceImpl implements CheckinService {
                 throw new RuntimeException("今日已签到，请勿重复签到");
             }
 
-            claimDeviceSlot(request, configuration, user, today);
-            
             // 创建签到记录；如果原记录是请假占位，允许用户实际到场后覆盖为签到记录
             CheckinRecord record = existingRecord.orElseGet(CheckinRecord::new);
             record.setUser(user);
@@ -205,7 +204,7 @@ public class CheckinServiceImpl implements CheckinService {
             record.setCheckinLatitude(request.getLatitude());
             record.setCheckinLongitude(request.getLongitude());
             record.setCheckinAddress(request.getAddress());
-            record.setCheckinMethod(request.getCheckinMethod());
+            record.setCheckinMethod(checkinMethod);
             // 将设备信息对象转换为JSON字符串存储
             if (request.getDeviceInfo() != null) {
                 try {
@@ -269,41 +268,6 @@ public class CheckinServiceImpl implements CheckinService {
         }
     }
 
-    private void claimDeviceSlot(CheckinRequest request, CheckinConfiguration configuration, User user, LocalDate date) {
-        if (request.getDeviceInfo() == null || request.getDeviceInfo().getDeviceFingerprint() == null
-                || request.getDeviceInfo().getDeviceFingerprint().isBlank()) {
-            throw new RuntimeException("签到需要提供设备指纹");
-        }
-        String fingerprintHash = sha256(request.getDeviceInfo().getDeviceFingerprint());
-        Optional<CheckinDeviceUsage> existing = checkinDeviceUsageRepository
-                .findByConfigurationIdAndUsageDateAndDeviceFingerprintHashAndDeletedFalse(
-                        configuration.getId(), date, fingerprintHash);
-        if (existing.isPresent() && !existing.get().getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("该设备已由其他账号在当前打卡时段使用");
-        }
-        if (existing.isEmpty()) {
-            CheckinDeviceUsage usage = new CheckinDeviceUsage();
-            usage.setConfiguration(configuration);
-            usage.setUser(user);
-            usage.setUsageDate(date);
-            usage.setDeviceFingerprintHash(fingerprintHash);
-            try {
-                checkinDeviceUsageRepository.saveAndFlush(usage);
-            } catch (org.springframework.dao.DataIntegrityViolationException e) {
-                throw new RuntimeException("该设备已由其他账号在当前打卡时段使用");
-            }
-        }
-    }
-
-    private String sha256(String value) {
-        try {
-            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
-                    .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-        } catch (java.security.NoSuchAlgorithmException e) {
-            throw new IllegalStateException("无法处理设备指纹", e);
-        }
-    }
-    
     @Override
     public CheckinResponse checkout(CheckoutRequest request, Long userId) {
         // TODO: 实现签退逻辑
@@ -651,131 +615,24 @@ public class CheckinServiceImpl implements CheckinService {
     }
     
     /**
-     * 验证二维码签到（动态二维码模式）
+     * 验证二维码签到（服务端签名动态二维码）
      * 
      * 验证逻辑：
      * 1. 验证二维码内容不为空
      * 2. 解析JSON格式的二维码内容
      * 3. 验证配置ID是否匹配
      * 4. 验证二维码类型是否正确
-     * 5. ⭐ 关键：验证二维码是否为最新版本（与配置中存储的二维码对比）
-     * 6. 验证自定义有效期（如果设置）
+     * 5. 验证服务端签名、签发时间和有效期
      * 
      * 动态二维码机制：
-     * - 管理员端每60秒自动刷新二维码，并保存到配置中
-     * - 学生扫描时，后端对比扫描的二维码与配置中存储的是否一致
-     * - 只有最新生成的二维码才能通过验证
-     * - 旧的二维码在新二维码生成后立即失效
+     * - 管理员端按服务端返回的轮换窗口刷新二维码
+     * - 学生扫描时，后端验证签名、配置ID和有效期
+     * - 令牌在自身有效期内可提交，避免刷新瞬间导致误失败
      */
     private void validateQRCodeCheckin(CheckinRequest request, CheckinConfiguration configuration) {
-        String qrCode = request.getQrCode();
-        if (qrCode == null || qrCode.trim().isEmpty()) {
-            throw new RuntimeException("二维码签到需要提供二维码内容");
-        }
-        
-        log.info("开始验证动态二维码签到: configId={}", configuration.getId());
-        
-        try {
-            // 解析二维码JSON内容
-            com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            com.fasterxml.jackson.databind.JsonNode qrData = objectMapper.readTree(qrCode);
-            
-            // 1. 验证二维码类型
-            String type = qrData.has("type") ? qrData.get("type").asText() : "";
-            if (!"CHECKIN".equals(type)) {
-                throw new RuntimeException("二维码类型错误，这不是一个有效的签到二维码");
-            }
-            
-            // 2. 验证配置ID是否匹配
-            Long qrConfigId = qrData.has("configId") ? qrData.get("configId").asLong() : null;
-            if (qrConfigId == null || !qrConfigId.equals(configuration.getId())) {
-                throw new RuntimeException("二维码与当前签到配置不匹配，请扫描正确的签到二维码");
-            }
-            
-            // ⭐ 3. 关键验证：检查是否为最新的二维码（动态二维码核心逻辑）
-            String storedQRCode = configuration.getQrCode();
-            if (storedQRCode == null || storedQRCode.trim().isEmpty()) {
-                log.warn("配置中未存储二维码，跳过动态验证");
-            } else {
-                // 对比扫描的二维码与配置中存储的最新二维码
-                if (!qrCode.equals(storedQRCode)) {
-                    log.warn("二维码已失效，不是最新版本。配置ID: {}", configuration.getId());
-                    
-                    // 尝试解析存储的二维码，获取最新生成时间
-                    try {
-                        com.fasterxml.jackson.databind.JsonNode storedQRData = objectMapper.readTree(storedQRCode);
-                        String latestGenerateTime = storedQRData.has("generateTime") 
-                            ? storedQRData.get("generateTime").asText() : "未知";
-                        
-                        throw new RuntimeException(
-                            "二维码已失效，请扫描最新的二维码。" +
-                            "当前二维码已被更新的版本替代（最新生成时间: " + latestGenerateTime + "）"
-                        );
-                    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-                        throw new RuntimeException("二维码已失效，请扫描现场张贴的最新二维码");
-                    }
-                }
-                log.info("✅ 动态二维码验证通过：扫描的二维码与配置中存储的最新版本一致");
-            }
-            
-            // 4. 验证生成时间（辅助检查，避免时间倒退）
-            String generateTimeStr = qrData.has("generateTime") ? qrData.get("generateTime").asText() : null;
-            if (generateTimeStr != null && !generateTimeStr.isEmpty()) {
-                try {
-                    LocalDateTime generateTime = LocalDateTime.parse(generateTimeStr, 
-                        java.time.format.DateTimeFormatter.ISO_DATE_TIME);
-                    LocalDateTime now = LocalDateTime.now();
-                    
-                    // 检查时间是否异常（未来时间）
-                    if (generateTime.isAfter(now.plusMinutes(5))) {
-                        throw new RuntimeException("二维码时间异常（生成时间在未来），请确保设备时间正确");
-                    }
-                    
-                    long minutesDiff = java.time.Duration.between(generateTime, now).toMinutes();
-                    log.info("二维码生成于 {} 分钟前", minutesDiff);
-                    
-                    // 警告：如果二维码时间过久，可能是缓存或网络问题
-                    if (minutesDiff > 10) {
-                        log.warn("二维码生成时间较久（{}分钟前），可能不是最新版本", minutesDiff);
-                    }
-                    
-                } catch (java.time.format.DateTimeParseException e) {
-                    log.warn("二维码生成时间格式错误: {}", generateTimeStr);
-                }
-            }
-            
-            // 5. 验证自定义有效期（如果设置）
-            String expireTime = qrData.has("expireTime") ? qrData.get("expireTime").asText() : null;
-            if (expireTime != null && !expireTime.trim().isEmpty()) {
-                try {
-                    LocalDateTime expireDateTime = LocalDateTime.parse(expireTime,
-                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-                    if (LocalDateTime.now().isAfter(expireDateTime)) {
-                        throw new RuntimeException("二维码已超过设定的有效期，请联系管理员");
-                    }
-                    log.info("二维码有效期验证通过: expireTime={}", expireTime);
-                } catch (java.time.format.DateTimeParseException e) {
-                    log.warn("二维码有效期格式错误: {}", expireTime);
-                }
-            }
-            
-            log.info("✅ 二维码签到验证通过: configId={}, type={}, 动态验证=通过", 
-                configuration.getId(), type);
-                
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            log.error("二维码内容解析失败，不是有效的JSON格式: {}", qrCode, e);
-            // 兼容旧格式：如果不是JSON，则使用简单的字符串匹配
-            if (!qrCode.contains(configuration.getId().toString())) {
-                throw new RuntimeException("二维码内容格式错误或与配置不匹配");
-            }
-            log.info("使用兼容模式验证二维码（非JSON格式）");
-        } catch (RuntimeException e) {
-            // 重新抛出业务异常
-            throw e;
-        } catch (Exception e) {
-            log.error("二维码验证过程发生异常", e);
-            throw new RuntimeException("二维码验证失败：" + e.getMessage());
-        }
+        log.info("开始验证服务端签名动态二维码: configId={}", configuration.getId());
+        dynamicQrCodeService.validate(request.getQrCode(), configuration.getId());
+        log.info("动态二维码验证通过: configId={}", configuration.getId());
     }
     
     // 注意：WiFi签到方法已被移除，因为已替换为"管理员审核"方式

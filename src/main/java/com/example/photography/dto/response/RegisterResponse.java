@@ -2,6 +2,9 @@ package com.example.photography.dto.response;
 
 import com.example.photography.model.enums.UserRole;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 /**
  * 用户注册响应DTO
  */
@@ -12,6 +15,7 @@ public class RegisterResponse {
     private String realName;
     private String email;
     private UserRole role;
+    private Set<UserRole> roles = new LinkedHashSet<>();
     private String departmentName;
     private String message;
     
@@ -68,6 +72,14 @@ public class RegisterResponse {
     
     public void setRole(UserRole role) {
         this.role = role;
+    }
+
+    public Set<UserRole> getRoles() {
+        return roles;
+    }
+
+    public void setRoles(Set<UserRole> roles) {
+        this.roles = roles == null ? new LinkedHashSet<>() : new LinkedHashSet<>(roles);
     }
     
     public String getDepartmentName() {

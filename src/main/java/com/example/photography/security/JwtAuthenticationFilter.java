@@ -2,6 +2,7 @@ package com.example.photography.security;
 
 import com.example.photography.model.entity.User;
 import com.example.photography.model.enums.AccountStatus;
+import com.example.photography.model.enums.UserRole;
 import com.example.photography.repository.UserRepository;
 import com.example.photography.util.JwtUtil;
 import jakarta.servlet.FilterChain;
@@ -17,8 +18,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Objects;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -39,8 +41,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         && (user.getAccountStatus() == null || user.getAccountStatus() == AccountStatus.ACTIVE)
                         && Objects.equals(jwtUtil.getTokenVersionFromToken(token), user.getTokenVersion() == null ? 0 : user.getTokenVersion())
                         && jwtUtil.validateToken(token, username)) {
+                    Set<SimpleGrantedAuthority> authorities = new LinkedHashSet<>();
+                    user.getEffectiveRoles().stream()
+                            .map(UserRole::normalized)
+                            .map(role -> new SimpleGrantedAuthority("ROLE_" + role.name()))
+                            .forEach(authorities::add);
+                    if (user.getEffectiveRoles().stream().anyMatch(UserRole::canManageBusiness)) {
+                        // Legacy controllers use ROLE_ADMIN as the common business-management permission.
+                        authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+                    }
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            username, null, Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
+                            username, null, authorities);
                     authentication.setDetails(user.getId());
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }

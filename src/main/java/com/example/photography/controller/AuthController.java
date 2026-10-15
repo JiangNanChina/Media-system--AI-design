@@ -63,17 +63,13 @@ public class AuthController {
             @RequestHeader(value = "X-Real-IP", required = false) String xRealIp,
             @RequestHeader(value = "User-Agent", required = false) String userAgent,
             HttpServletRequest httpRequest) {
-        try {
-            // 获取真实IP地址
-            String ipAddress = getClientIpAddress(httpRequest, xForwardedFor, xRealIp);
-            
-            LoginResponse response = authService.login(request, ipAddress, userAgent);
-            RefreshTokenService.IssuedRefreshToken refresh = refreshTokenService.issue(response.getUserId());
-            return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, refreshCookie(refresh.rawToken(), httpRequest).toString())
-                    .body(ApiResponse.success("登录成功", response));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
-        }
+        // Let the global exception handler preserve the original login error
+        // message instead of converting every failure into a generic response.
+        String ipAddress = getClientIpAddress(httpRequest, xForwardedFor, xRealIp);
+        LoginResponse response = authService.login(request, ipAddress, userAgent);
+        RefreshTokenService.IssuedRefreshToken refresh = refreshTokenService.issue(response.getUserId());
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, refreshCookie(refresh.rawToken(), httpRequest).toString())
+                .body(ApiResponse.success("登录成功", response));
     }
     
     @PostMapping("/refresh")

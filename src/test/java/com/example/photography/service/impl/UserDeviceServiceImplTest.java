@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,6 +34,7 @@ class UserDeviceServiceImplTest {
         UserRepository userRepository = mock(UserRepository.class);
         service = new UserDeviceServiceImpl(userDeviceRepository, deviceAuditLogRepository, userRepository);
         user = user(1L, "member");
+        when(userRepository.findByIdForDeviceBinding(user.getId())).thenReturn(Optional.of(user));
     }
 
     @Test
@@ -102,9 +104,43 @@ class UserDeviceServiceImplTest {
         assertThat(bound.getDeviceFingerprint()).isEqualTo("browser_old");
     }
 
+    @Test
+    void hardwareFingerprintRestoresDeviceWhenBrowserStorageWasCleared() {
+        UserDevice bound = device("browser_old", UserDevice.DeviceType.MOBILE, "Android 14", "Chrome 130.0.0", "1080x2400");
+        bound.setHardwareFingerprint("hardware_v1_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        DeviceInfoRequest incoming = mobileInfo("browser_new", "Android 14", "Chrome 131.0.0", "2400x1080");
+        incoming.setHardwareFingerprint("hardware_v1_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+
+        when(userDeviceRepository.findActiveDevicesByUserAndTypes(eq(user), any())).thenReturn(List.of(bound));
+
+        DeviceValidationResult result = service.validateAndBindDevice(user, incoming, "127.0.0.1", "ua");
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(bound.getDeviceFingerprint()).isEqualTo("browser_new");
+        verify(userDeviceRepository).save(bound);
+    }
+
+    @Test
+    void duplicateHardwareFingerprintDoesNotAutoRestore() {
+        UserDevice first = device("browser_one", UserDevice.DeviceType.MOBILE, "Android 14", "Chrome 130.0.0", "1080x2400");
+        UserDevice second = device("browser_two", UserDevice.DeviceType.MOBILE, "Android 14", "Chrome 130.0.0", "1080x2400");
+        String hardware = "hardware_v1_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        first.setHardwareFingerprint(hardware);
+        second.setHardwareFingerprint(hardware);
+        DeviceInfoRequest incoming = mobileInfo("browser_new", "Android 14", "Chrome 131.0.0", "1080x2400");
+        incoming.setHardwareFingerprint(hardware);
+
+        when(userDeviceRepository.findActiveDevicesByUserAndTypes(eq(user), any())).thenReturn(List.of(first, second));
+
+        DeviceValidationResult result = service.validateAndBindDevice(user, incoming, "127.0.0.1", "ua");
+
+        assertThat(result.isSuccess()).isFalse();
+    }
+
     private DeviceInfoRequest mobileInfo(String fingerprint, String osInfo, String browserInfo, String screenResolution) {
         DeviceInfoRequest request = new DeviceInfoRequest();
         request.setDeviceFingerprint(fingerprint);
+        request.setHardwareFingerprint("hardware_v1_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
         request.setDeviceName("Android Device");
         request.setDeviceType("MOBILE");
         request.setOsInfo(osInfo);

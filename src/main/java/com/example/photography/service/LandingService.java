@@ -39,7 +39,9 @@ public class LandingService {
             SiteConfig.Keys.LANDING_HERO_MEDIA_TYPE, SiteConfig.Keys.LANDING_BRAND_TITLE,
             SiteConfig.Keys.LANDING_NAV_HOME_LABEL, SiteConfig.Keys.LANDING_NAV_FEATURES_LABEL,
             SiteConfig.Keys.LANDING_NAV_SHOWCASE_LABEL, SiteConfig.Keys.LANDING_NAV_SUBMISSION_LABEL,
+            SiteConfig.Keys.LANDING_NAV_JOIN_LABEL,
             SiteConfig.Keys.LANDING_HERO_BADGE, SiteConfig.Keys.LANDING_HERO_PRIMARY_CTA,
+            SiteConfig.Keys.LANDING_HERO_JOIN_CTA,
             SiteConfig.Keys.LANDING_HERO_SECONDARY_CTA, SiteConfig.Keys.LANDING_FEATURES_EYEBROW,
             SiteConfig.Keys.LANDING_FEATURES_TITLE, SiteConfig.Keys.LANDING_FEATURES_DESCRIPTION,
             SiteConfig.Keys.LANDING_SHOWCASE_EYEBROW, SiteConfig.Keys.LANDING_SHOWCASE_TITLE,
@@ -258,10 +260,12 @@ public class LandingService {
             case SiteConfig.Keys.LANDING_NAV_FEATURES_LABEL -> "校园特色";
             case SiteConfig.Keys.LANDING_NAV_SHOWCASE_LABEL -> "部门风采";
             case SiteConfig.Keys.LANDING_NAV_SUBMISSION_LABEL -> "视频投稿";
+            case SiteConfig.Keys.LANDING_NAV_JOIN_LABEL -> "加入我们";
             case SiteConfig.Keys.LANDING_HERO_BADGE -> "校园官方新媒体平台";
             case SiteConfig.Keys.LANDING_HERO_TITLE -> "记录校园，让每一种声音被看见";
             case SiteConfig.Keys.LANDING_HERO_SUBTITLE -> "校融媒体中心连接校园现场、青年创作与公共表达";
             case SiteConfig.Keys.LANDING_HERO_PRIMARY_CTA -> "视频投稿";
+            case SiteConfig.Keys.LANDING_HERO_JOIN_CTA -> "加入我们";
             case SiteConfig.Keys.LANDING_HERO_SECONDARY_CTA -> "了解我们";
             case SiteConfig.Keys.LANDING_FEATURES_EYEBROW -> "校园特色";
             case SiteConfig.Keys.LANDING_FEATURES_TITLE -> "发现不一样的校园";

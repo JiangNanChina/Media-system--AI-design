@@ -27,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.Year;
@@ -68,8 +69,8 @@ public class JoinApplicationService {
 
     public JoinApplicationResponse submit(String realName, String qqEmail, String phone, Gender gender,
                                           String college, String major, Integer enrollmentYear,
-                                          String selfIntroduction, MultipartFile work) {
-        validateApplicant(realName, qqEmail, phone, gender, college, major, enrollmentYear, selfIntroduction);
+                                          String className, String selfIntroduction, MultipartFile work) {
+        validateApplicant(realName, qqEmail, phone, gender, college, major, enrollmentYear, className, selfIntroduction);
         WorkMetadata metadata = validateWork(work);
 
         String storedFilename = null;
@@ -96,6 +97,7 @@ public class JoinApplicationService {
             entity.setCollege(college.trim());
             entity.setMajor(major.trim());
             entity.setEnrollmentYear(enrollmentYear);
+            entity.setClassName(className.trim());
             entity.setSelfIntroduction(trimTo(selfIntroduction, 5000));
 
             if (metadata != null) {
@@ -145,7 +147,7 @@ public class JoinApplicationService {
 
         User reviewer = userRepository.findById(reviewerId)
                 .orElseThrow(() -> new IllegalArgumentException("审核人不存在"));
-        if (reviewer.getRole() == null || !reviewer.getRole().canManageBusiness()) {
+        if (!reviewer.canManageBusiness()) {
             throw new AccessDeniedException("无入部申请审核权限");
         }
 
@@ -178,6 +180,27 @@ public class JoinApplicationService {
         return JoinApplicationResponse.from(joinApplicationRepository.save(entity));
     }
 
+    public void deletePermanently(Long id) {
+        JoinApplication entity = findEntity(id);
+        Path workPath = null;
+
+        if (StringUtils.hasText(entity.getWorkStoredFilename())) {
+            workPath = resolveStoredWork(entity.getWorkStoredFilename());
+            try {
+                Files.deleteIfExists(workPath);
+            } catch (IOException e) {
+                log.error("入部申请作品文件删除失败，保留数据库记录: id={}, applicationNumber={}, path={}",
+                        entity.getId(), entity.getApplicationNumber(), workPath, e);
+                throw new UncheckedIOException("服务器中的入部申请作品删除失败，数据库记录未删除", e);
+            }
+        }
+
+        joinApplicationRepository.delete(entity);
+        joinApplicationRepository.flush();
+        log.info("已永久删除入部申请及服务器作品文件: id={}, applicationNumber={}, path={}",
+                entity.getId(), entity.getApplicationNumber(), workPath);
+    }
+
     @Transactional(readOnly = true)
     public Resource loadWork(Long id) {
         JoinApplication entity = findEntity(id);
@@ -185,10 +208,7 @@ public class JoinApplicationService {
             throw new IllegalArgumentException("该申请未上传作品");
         }
         try {
-            Path path = workDirectory.resolve(entity.getWorkStoredFilename()).normalize();
-            if (!path.startsWith(workDirectory)) {
-                throw new IllegalArgumentException("非法文件路径");
-            }
+            Path path = resolveStoredWork(entity.getWorkStoredFilename());
             Resource resource = new UrlResource(path.toUri());
             if (!resource.exists() || !resource.isReadable()) {
                 throw new IllegalArgumentException("作品文件不存在");
@@ -197,6 +217,18 @@ public class JoinApplicationService {
         } catch (java.net.MalformedURLException e) {
             throw new IllegalArgumentException("作品文件路径无效", e);
         }
+    }
+
+    private Path resolveStoredWork(String storedFilename) {
+        Path filename = Paths.get(storedFilename);
+        if (filename.isAbsolute() || filename.getNameCount() != 1) {
+            throw new IllegalArgumentException("非法文件路径");
+        }
+        Path path = workDirectory.resolve(filename).normalize();
+        if (!workDirectory.equals(path.getParent())) {
+            throw new IllegalArgumentException("非法文件路径");
+        }
+        return path;
     }
 
     @Transactional(readOnly = true)
@@ -217,7 +249,8 @@ public class JoinApplicationService {
     }
 
     private void validateApplicant(String realName, String qqEmail, String phone, Gender gender,
-                                   String college, String major, Integer enrollmentYear, String selfIntroduction) {
+                                   String college, String major, Integer enrollmentYear, String className,
+                                   String selfIntroduction) {
         if (!StringUtils.hasText(realName) || realName.trim().length() > 80) {
             throw new IllegalArgumentException("姓名不能为空且不能超过80字");
         }
@@ -240,6 +273,9 @@ public class JoinApplicationService {
         if (enrollmentYear == null || enrollmentYear < 2000 || enrollmentYear > currentYear + 1) {
             throw new IllegalArgumentException("请输入有效入学年份");
         }
+        if (!StringUtils.hasText(className) || className.trim().length() > 80) {
+            throw new IllegalArgumentException("班级不能为空且不能超过80字");
+        }
         if (!StringUtils.hasText(selfIntroduction) || selfIntroduction.trim().length() > 5000) {
             throw new IllegalArgumentException("自我介绍不能为空且不能超过5000字");
         }
@@ -261,13 +297,23 @@ public class JoinApplicationService {
         String extension = Optional.ofNullable(StringUtils.getFilenameExtension(original))
                 .orElse("")
                 .toLowerCase(Locale.ROOT);
+        String declared = Objects.requireNonNullElse(file.getContentType(), "application/octet-stream").toLowerCase(Locale.ROOT);
+        if (extension.equals("zip")) {
+            if (!UploadArchiveValidator.MIME_TYPES.contains(declared)) {
+                throw new IllegalArgumentException("压缩包MIME类型不受支持");
+            }
+            Set<String> allowedExtensions = new HashSet<>(IMAGE_EXTENSIONS);
+            allowedExtensions.addAll(VIDEO_EXTENSIONS);
+            UploadArchiveValidator.validate(file, allowedExtensions, MAX_WORK_SIZE);
+            return new WorkMetadata("zip", "application/zip");
+        }
+
         boolean image = IMAGE_EXTENSIONS.contains(extension);
         boolean video = VIDEO_EXTENSIONS.contains(extension);
         if (!image && !video) {
-            throw new IllegalArgumentException("作品仅支持JPG、PNG、GIF、WebP、BMP、MP4、MOV和WebM格式");
+            throw new IllegalArgumentException("作品仅支持JPG、PNG、GIF、WebP、BMP、MP4、MOV、WebM或系统生成的ZIP格式");
         }
 
-        String declared = Objects.requireNonNullElse(file.getContentType(), "application/octet-stream").toLowerCase(Locale.ROOT);
         if (!ALLOWED_MIME_TYPES.contains(declared)) {
             throw new IllegalArgumentException("作品文件MIME类型不受支持");
         }

@@ -36,6 +36,15 @@ public class UserDeviceServiceImpl implements UserDeviceService {
     @Override
     @Transactional
     public DeviceValidationResult validateAndBindDevice(User user, DeviceInfoRequest deviceInfo, String ipAddress, String userAgent) {
+        if (user == null || user.getId() == null || deviceInfo == null) {
+            return new DeviceValidationResult(false, "设备信息不完整，拒绝登录", null,
+                    DeviceValidationResult.ValidationAction.DEVICE_BLOCKED);
+        }
+
+        // 同一账号的两个并发登录必须串行执行，否则都可能观察到空槽位并各自创建绑定。
+        User lockedUser = userRepository.findByIdForDeviceBinding(user.getId())
+                .orElseThrow(() -> new IllegalStateException("用户不存在或已被删除"));
+        normalizeDeviceInfo(deviceInfo);
         log.info("验证用户设备: userId={}, fingerprint={}", user.getId(), deviceInfo.getDeviceFingerprint());
         
         // 根据设备类型，允许绑定两个槽位：PC端（DESKTOP）一个、移动端（MOBILE/TABLET）一个
@@ -45,10 +54,9 @@ public class UserDeviceServiceImpl implements UserDeviceService {
 
         if (isDesktop) {
             return validateDeviceInSlot(
-                    user,
+                    lockedUser,
                     deviceInfo,
                     ipAddress,
-                    UserDevice.DeviceType.DESKTOP,
                     List.of(UserDevice.DeviceType.DESKTOP),
                     "PC端",
                     "当前账号已在其他PC设备上绑定，无法在此设备登录。如需更换设备，请联系管理员。"
@@ -57,10 +65,9 @@ public class UserDeviceServiceImpl implements UserDeviceService {
 
         if (isMobileGroup) {
             return validateDeviceInSlot(
-                    user,
+                    lockedUser,
                     deviceInfo,
                     ipAddress,
-                    incomingType,
                     List.of(UserDevice.DeviceType.MOBILE, UserDevice.DeviceType.TABLET),
                     "移动端",
                     "当前账号已在其他移动设备上绑定，无法在此设备登录。如需更换设备，请联系管理员。"
@@ -74,7 +81,6 @@ public class UserDeviceServiceImpl implements UserDeviceService {
     private DeviceValidationResult validateDeviceInSlot(User user,
                                                        DeviceInfoRequest deviceInfo,
                                                        String ipAddress,
-                                                       UserDevice.DeviceType suspendedType,
                                                        List<UserDevice.DeviceType> activeTypes,
                                                        String slotName,
                                                        String blockedMessage) {
@@ -89,6 +95,17 @@ public class UserDeviceServiceImpl implements UserDeviceService {
             return new DeviceValidationResult(true, "设备验证通过", device, DeviceValidationResult.ValidationAction.DEVICE_MATCHED);
         }
 
+        Optional<UserDevice> hardwareMatchedDevice = findUniqueHardwareFingerprintMatch(activeDevices, deviceInfo);
+        if (hardwareMatchedDevice.isPresent()) {
+            UserDevice device = hardwareMatchedDevice.get();
+            updateDeviceInfo(device, deviceInfo, ipAddress);
+            userDeviceRepository.save(device);
+            log.info("{}设备本地ID丢失，已通过硬件特征恢复: userId={}, deviceId={}",
+                    slotName, user.getId(), device.getId());
+            return new DeviceValidationResult(true, "已识别为原设备，设备标识已恢复", device,
+                    DeviceValidationResult.ValidationAction.DEVICE_MATCHED);
+        }
+
         Optional<UserDevice> legacyCompatibleDevice = findLegacyCompatibleDevice(activeDevices, deviceInfo);
         if (legacyCompatibleDevice.isPresent()) {
             UserDevice device = legacyCompatibleDevice.get();
@@ -98,15 +115,28 @@ public class UserDeviceServiceImpl implements UserDeviceService {
             return new DeviceValidationResult(true, "设备信息已更新", device, DeviceValidationResult.ValidationAction.DEVICE_MATCHED);
         }
 
+        Optional<UserDevice> transitionDevice = findTransitionCompatibleDevice(activeDevices, deviceInfo);
+        if (transitionDevice.isPresent()) {
+            UserDevice device = transitionDevice.get();
+            updateDeviceInfo(device, deviceInfo, ipAddress);
+            userDeviceRepository.save(device);
+            log.info("{}旧版绑定已完成一次性高置信迁移: userId={}, deviceId={}",
+                    slotName, user.getId(), device.getId());
+            return new DeviceValidationResult(true, "已识别为原设备，设备信息已升级", device,
+                    DeviceValidationResult.ValidationAction.DEVICE_MATCHED);
+        }
+
         if (!activeDevices.isEmpty()) {
             log.warn("{}设备指纹不匹配，拒绝登录: userId={}, 当前设备指纹={}", 
                 slotName, user.getId(), deviceInfo.getDeviceFingerprint());
             return new DeviceValidationResult(false, blockedMessage, null, DeviceValidationResult.ValidationAction.DEVICE_BLOCKED);
         }
 
-        List<UserDevice> suspendedDevices = userDeviceRepository.findSuspendedDevicesByUserAndType(user, suspendedType);
+        List<UserDevice> suspendedDevices = userDeviceRepository.findSuspendedDevicesByUserAndTypes(user, activeTypes);
         Optional<UserDevice> matchingSuspendedDevice = findExactFingerprintMatch(suspendedDevices, deviceInfo)
-                .or(() -> findLegacyCompatibleDevice(suspendedDevices, deviceInfo));
+                .or(() -> findUniqueHardwareFingerprintMatch(suspendedDevices, deviceInfo))
+                .or(() -> findLegacyCompatibleDevice(suspendedDevices, deviceInfo))
+                .or(() -> findTransitionCompatibleDevice(suspendedDevices, deviceInfo));
 
         if (matchingSuspendedDevice.isPresent()) {
             UserDevice device = matchingSuspendedDevice.get();
@@ -290,6 +320,7 @@ public class UserDeviceServiceImpl implements UserDeviceService {
         UserDevice device = new UserDevice();
         device.setUser(user);
         device.setDeviceFingerprint(deviceInfo.getDeviceFingerprint());
+        device.setHardwareFingerprint(deviceInfo.getHardwareFingerprint());
         device.setDeviceName(deviceInfo.getDeviceName());
         device.setDeviceType(parseDeviceType(deviceInfo.getDeviceType()));
         device.setOsInfo(deviceInfo.getOsInfo());
@@ -317,6 +348,9 @@ public class UserDeviceServiceImpl implements UserDeviceService {
         // 更新可能变化的信息
         if (StringUtils.hasText(deviceInfo.getDeviceFingerprint())) {
             device.setDeviceFingerprint(deviceInfo.getDeviceFingerprint());
+        }
+        if (isValidHardwareFingerprint(deviceInfo.getHardwareFingerprint())) {
+            device.setHardwareFingerprint(deviceInfo.getHardwareFingerprint());
         }
         if (StringUtils.hasText(deviceInfo.getDeviceName())) {
             device.setDeviceName(deviceInfo.getDeviceName());
@@ -356,6 +390,100 @@ public class UserDeviceServiceImpl implements UserDeviceService {
         return devices.stream()
                 .filter(device -> canMigrateLegacyFingerprint(device, deviceInfo))
                 .findFirst();
+    }
+
+    private Optional<UserDevice> findUniqueHardwareFingerprintMatch(List<UserDevice> devices, DeviceInfoRequest deviceInfo) {
+        if (deviceInfo == null || !isValidHardwareFingerprint(deviceInfo.getHardwareFingerprint())) {
+            return Optional.empty();
+        }
+
+        List<UserDevice> matches = devices.stream()
+                .filter(device -> deviceInfo.getHardwareFingerprint().equals(device.getHardwareFingerprint()))
+                .toList();
+        if (matches.size() != 1) {
+            if (matches.size() > 1) {
+                log.warn("检测到重复设备硬件特征，拒绝自动恢复: fingerprint={}, count={}",
+                        deviceInfo.getHardwareFingerprint(), matches.size());
+            }
+            return Optional.empty();
+        }
+        return Optional.of(matches.get(0));
+    }
+
+    /**
+     * 新字段上线前的过渡策略：仅为有明确 Android 型号、且环境信息全部吻合的旧绑定
+     * 提供一次恢复。桌面设备和通用型号不做猜测，避免相似设备被错误认领。
+     */
+    private Optional<UserDevice> findTransitionCompatibleDevice(List<UserDevice> devices, DeviceInfoRequest deviceInfo) {
+        List<UserDevice> matches = devices.stream()
+                .filter(device -> !StringUtils.hasText(device.getHardwareFingerprint()))
+                .filter(device -> isPersistedBrowserId(device.getDeviceFingerprint()))
+                .filter(device -> isHighConfidenceMobileProfile(device, deviceInfo))
+                .toList();
+        return matches.size() == 1 ? Optional.of(matches.get(0)) : Optional.empty();
+    }
+
+    private boolean isHighConfidenceMobileProfile(UserDevice device, DeviceInfoRequest deviceInfo) {
+        UserDevice.DeviceType incomingType = parseDeviceType(deviceInfo.getDeviceType());
+        if (!isSameDeviceGroup(device.getDeviceType(), incomingType)
+                || incomingType == UserDevice.DeviceType.DESKTOP) {
+            return false;
+        }
+
+        String existingModel = extractAndroidModel(device.getDeviceName());
+        String incomingModel = extractAndroidModel(deviceInfo.getDeviceName());
+        return StringUtils.hasText(existingModel)
+                && existingModel.equalsIgnoreCase(incomingModel)
+                && isSameFamily(device.getOsInfo(), deviceInfo.getOsInfo())
+                && isCompatibleBrowserFamily(device.getBrowserInfo(), deviceInfo.getBrowserInfo())
+                && isSameScreenResolution(device.getScreenResolution(), deviceInfo.getScreenResolution())
+                && equalsIgnoreCase(device.getTimezone(), deviceInfo.getTimezone())
+                && equalsIgnoreCase(device.getLanguage(), deviceInfo.getLanguage())
+                && isValidHardwareFingerprint(deviceInfo.getHardwareFingerprint());
+    }
+
+    private String extractAndroidModel(String deviceName) {
+        if (!StringUtils.hasText(deviceName) || !deviceName.trim().toLowerCase().startsWith("android")) {
+            return "";
+        }
+        String model = deviceName.trim()
+                .replaceFirst("(?i)^android(?:\\s+[\\d.]+)?\\s*", "")
+                .trim();
+        if (!StringUtils.hasText(model)
+                || List.of("device", "mobile", "zh-cn", "wv").contains(model.toLowerCase())) {
+            return "";
+        }
+        return model;
+    }
+
+    private boolean equalsIgnoreCase(String first, String second) {
+        return StringUtils.hasText(first) && StringUtils.hasText(second)
+                && first.trim().equalsIgnoreCase(second.trim());
+    }
+
+    private boolean isPersistedBrowserId(String fingerprint) {
+        return StringUtils.hasText(fingerprint) && fingerprint.startsWith("browser_");
+    }
+
+    private boolean isValidHardwareFingerprint(String fingerprint) {
+        return StringUtils.hasText(fingerprint)
+                && fingerprint.matches("^hardware_v1_[0-9a-f]{64}$");
+    }
+
+    private void normalizeDeviceInfo(DeviceInfoRequest deviceInfo) {
+        deviceInfo.setDeviceFingerprint(trimToNull(deviceInfo.getDeviceFingerprint()));
+        deviceInfo.setHardwareFingerprint(trimToNull(deviceInfo.getHardwareFingerprint()));
+        deviceInfo.setDeviceName(trimToNull(deviceInfo.getDeviceName()));
+        deviceInfo.setDeviceType(trimToNull(deviceInfo.getDeviceType()));
+        deviceInfo.setOsInfo(trimToNull(deviceInfo.getOsInfo()));
+        deviceInfo.setBrowserInfo(trimToNull(deviceInfo.getBrowserInfo()));
+        deviceInfo.setScreenResolution(trimToNull(deviceInfo.getScreenResolution()));
+        deviceInfo.setTimezone(trimToNull(deviceInfo.getTimezone()));
+        deviceInfo.setLanguage(trimToNull(deviceInfo.getLanguage()));
+    }
+
+    private String trimToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     /**

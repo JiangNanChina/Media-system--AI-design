@@ -13,6 +13,7 @@ spring:
     hikari:
       minimum-idle: 5
       maximum-pool-size: 20
+      connection-init-sql: SET time_zone = '+08:00'
       auto-commit: true
       idle-timeout: 30000
       pool-name: DatebookHikariCP
@@ -55,6 +56,12 @@ jwt:
   expiration: 900000
   refresh-expiration: 604800000
 
+checkin:
+  qr:
+    secret: ${CHECKIN_QR_SECRET:${JWT_SECRET}}
+    validity-seconds: 90
+    refresh-after-seconds: 45
+
 # 应用配置
 app:
   admin:
@@ -82,6 +89,9 @@ server:
   port: 8080
   servlet:
     context-path: /api
+  tomcat:
+    max-http-form-post-size: 510MB
+    max-swallow-size: 510MB
   compression:
     enabled: true
     mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json

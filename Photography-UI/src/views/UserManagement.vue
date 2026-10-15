@@ -103,9 +103,9 @@
         style="width: 100%"
         :class="{ 'mobile-table': isMobile }"
       >
-        <el-table-column type="selection" width="55" />
+        <el-table-column type="selection" width="48" />
         
-        <el-table-column label="头像" width="80">
+        <el-table-column label="头像" width="64">
           <template #default="{ row }">
             <el-avatar :size="40" :src="getAvatarUrl(row.avatarUrl)">
               <el-icon><UserFilled /></el-icon>
@@ -113,27 +113,40 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="username" label="用户名" min-width="120" />
+        <el-table-column prop="username" label="用户名" min-width="100" />
         
-        <el-table-column prop="realName" label="真实姓名" min-width="120" />
+        <el-table-column prop="realName" label="真实姓名" min-width="100" />
         
-        <el-table-column prop="email" label="邮箱" min-width="180" show-overflow-tooltip v-if="!isMobile" />
+        <el-table-column prop="email" label="邮箱" min-width="155" show-overflow-tooltip v-if="!isMobile" />
         
-        <el-table-column label="角色" width="100">
+        <el-table-column label="角色" :min-width="isMobile ? 150 : 170">
           <template #default="{ row }">
-            <el-tag :type="roleTagType(row.role)" size="small">
-              {{ roleLabel(row.role) }}
-            </el-tag>
+            <div v-if="displayRoles(row).length" class="role-tags">
+              <el-tag
+                v-for="role in displayRoles(row)"
+                :key="role"
+                :type="roleTagType(role)"
+                :effect="isHighestRole(row, role) ? 'light' : 'plain'"
+                :class="['role-tag', { 'is-highest-role': isHighestRole(row, role) }]"
+                size="small"
+              >
+                <span class="role-tag-content">
+                  <span>{{ roleLabel(role) }}</span>
+                  <span v-if="isHighestRole(row, role)" class="highest-role-marker">最高</span>
+                </span>
+              </el-tag>
+            </div>
+            <span v-else class="empty-role">未分配</span>
           </template>
         </el-table-column>
         
-        <el-table-column label="部门" min-width="120" v-if="!isMobile">
+        <el-table-column label="部门" min-width="100" v-if="!isMobile">
           <template #default="{ row }">
             {{ row.departmentName || '未分配' }}
           </template>
         </el-table-column>
         
-        <el-table-column label="状态" width="100">
+        <el-table-column label="状态" width="80">
           <template #default="{ row }">
             <el-tag :type="row.enabled ? 'success' : 'danger'" size="small">
               {{ row.enabled ? '启用' : '禁用' }}
@@ -141,7 +154,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column label="创建时间" width="180" v-if="!isMobile">
+        <el-table-column label="创建时间" width="150" v-if="!isMobile">
           <template #default="{ row }">
             {{ formatTime(row.createdAt) }}
           </template>
@@ -149,14 +162,14 @@
         
         <el-table-column
           label="操作"
-          :width="isMobile ? '120' : '268'"
+          :width="useActionMenu ? '112' : '268'"
           fixed="right"
           align="center"
           header-align="center"
           class-name="operation-column"
         >
           <template #default="{ row }">
-            <div v-if="isMobile" class="mobile-actions">
+            <div v-if="useActionMenu" class="mobile-actions">
               <el-dropdown trigger="click" @command="(command) => handleMobileAction(command, row)">
                 <el-button type="primary" size="small">
                   操作 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -281,12 +294,17 @@
             </el-form-item>
           </el-col>
           <el-col :xs="24" :sm="12">
-            <el-form-item label="角色" prop="role">
+            <el-form-item label="角色" prop="roles">
               <el-select 
-                v-model="userForm.role" 
-                placeholder="选择角色" 
+                v-model="userForm.roles"
+                placeholder="至少选择一个角色"
                 style="width: 100%"
+                multiple
+                collapse-tags
+                collapse-tags-tooltip
+                :max-collapse-tags="isMobile ? 1 : 2"
                 :disabled="!userStore.isSuperAdmin"
+                aria-label="用户角色，可多选，按最高角色级别授权"
               >
                 <el-option v-for="option in roleOptions" :key="option.value" :label="option.label" :value="option.value" />
               </el-select>
@@ -369,21 +387,26 @@ import {
 import { useUserStore } from '@/stores/user'
 import request from '@/utils/request'
 import { getUploadedImageUrl } from '@/utils/imageUrl'
+import {
+  ROLE_OPTIONS,
+  getHighestRoles,
+  getUserRoles,
+  normalizeRole,
+  normalizeRoles,
+  roleLabel,
+  roleTagType,
+  sameRoles
+} from '@/utils/userRoles'
 
 const userStore = useUserStore()
-const roleOptions = [
-  { label: '部员', value: 'MEMBER' },
-  { label: '部长', value: 'MINISTER' },
-  { label: '主任', value: 'DIRECTOR' },
-  { label: '指导老师', value: 'ADVISOR' },
-  { label: '系统超级管理员', value: 'SUPER_ADMIN' }
-]
-const roleLabel = role => roleOptions.find(option => option.value === role)?.label || (role === 'ADMIN' ? '系统超级管理员' : role)
-const roleTagType = role => ({ SUPER_ADMIN: 'danger', ADMIN: 'danger', DIRECTOR: 'warning', MINISTER: 'success', ADVISOR: 'info' }[role] || 'primary')
+const roleOptions = ROLE_OPTIONS
+const displayRoles = user => getUserRoles(user)
+const isHighestRole = (user, role) => getHighestRoles(displayRoles(user)).includes(normalizeRole(role))
 
 // 移动端检测
 const screenWidth = ref(window.innerWidth)
 const isMobile = computed(() => screenWidth.value < 768)
+const useActionMenu = computed(() => screenWidth.value <= 1600)
 
 const updateScreenWidth = () => {
   screenWidth.value = window.innerWidth
@@ -432,7 +455,7 @@ const userForm = reactive({
   username: '',
   realName: '',
   email: '',
-  role: 'MEMBER',
+  roles: ['MEMBER'],
   departmentId: '',
   enabled: true,
   password: ''
@@ -453,8 +476,8 @@ const userRules = {
     { required: true, message: '请输入邮箱地址', trigger: 'blur' },
     { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
   ],
-  role: [
-    { required: true, message: '请选择角色', trigger: 'change' }
+  roles: [
+    { type: 'array', required: true, min: 1, message: '至少选择一个角色', trigger: 'change' }
   ],
   password: [
     { required: true, message: '请输入初始密码', trigger: 'blur' },
@@ -481,7 +504,6 @@ const fetchUsers = async () => {
       }
     })
     
-    console.log('发送用户查询请求，参数:', params)
     if (userStore.isMinister) {
       const response = await request.get('/department-members')
       let rows = response.data || []
@@ -489,7 +511,10 @@ const fetchUsers = async () => {
         const keyword = searchForm.keyword.toLowerCase()
         rows = rows.filter(user => `${user.username || ''}${user.realName || ''}`.toLowerCase().includes(keyword))
       }
-      if (searchForm.role) rows = rows.filter(user => user.role === searchForm.role)
+      if (searchForm.role) {
+        const selectedRole = normalizeRole(searchForm.role)
+        rows = rows.filter(user => displayRoles(user).includes(selectedRole))
+      }
       if (searchForm.enabled !== '') rows = rows.filter(user => user.enabled === searchForm.enabled)
       pagination.total = rows.length
       const offset = (pagination.page - 1) * pagination.size
@@ -503,10 +528,6 @@ const fetchUsers = async () => {
       userList.value = response.data.content || []
       pagination.total = response.data.totalElements || 0
       
-      console.log('真实API数据加载成功:')
-      console.log('- 总用户数:', pagination.total)
-      console.log('- 当前页用户数:', userList.value.length)
-      console.log('- 用户列表:', userList.value)
     }
     
   } catch (error) {
@@ -517,8 +538,6 @@ const fetchUsers = async () => {
     pagination.total = 0
   } finally {
     loading.value = false
-    console.log('用户列表加载完成，loading状态:', loading.value)
-    console.log('最终用户列表长度:', userList.value.length)
   }
 }
 
@@ -597,12 +616,15 @@ const handleCreate = () => {
 
 const handleEdit = (user) => {
   editingUser.value = user
-  Object.keys(userForm).forEach(key => {
-    if (key === 'password') {
-      userForm[key] = '' // 编辑时不显示密码
-    } else {
-      userForm[key] = user[key] || ''
-    }
+  const roles = displayRoles(user)
+  Object.assign(userForm, {
+    username: user.username || '',
+    realName: user.realName || '',
+    email: user.email || '',
+    roles: roles.length > 0 ? [...roles] : ['MEMBER'],
+    departmentId: user.departmentId ?? '',
+    enabled: user.enabled !== false,
+    password: ''
   })
   showCreateDialog.value = true
   
@@ -626,15 +648,16 @@ const handleCancelEdit = () => {
 
 // 重置表单
 const resetForm = () => {
-  Object.keys(userForm).forEach(key => {
-    if (key === 'role') {
-      userForm[key] = 'MEMBER'
-    } else if (key === 'enabled') {
-      userForm[key] = true
-    } else {
-      userForm[key] = ''
-    }
+  Object.assign(userForm, {
+    username: '',
+    realName: '',
+    email: '',
+    roles: ['MEMBER'],
+    departmentId: '',
+    enabled: true,
+    password: ''
   })
+  usernameFormatErrorUserForm.value = ''
   if (userFormRef.value) {
     userFormRef.value.clearValidate()
   }
@@ -652,12 +675,12 @@ const handleSaveUser = async () => {
     await userFormRef.value.validate()
     saving.value = true
     
-    const userData = { ...userForm }
+    const selectedRoles = normalizeRoles(userForm.roles)
+    const userData = { ...userForm, roles: selectedRoles }
     
     if (editingUser.value) {
       delete userData.password
-      const selectedRole = userData.role
-      delete userData.role
+      delete userData.roles
       if (userStore.isMinister) {
         await request.put(`/department-members/${editingUser.value.id}`, {
           realName: userData.realName,
@@ -666,8 +689,8 @@ const handleSaveUser = async () => {
         })
       } else {
         await request.put(`/users/${editingUser.value.id}`, userData)
-        if (userStore.isSuperAdmin && selectedRole !== editingUser.value.role) {
-          await request.put(`/accounts/admin/${editingUser.value.id}/role`, { role: selectedRole })
+        if (userStore.isSuperAdmin && !sameRoles(selectedRoles, displayRoles(editingUser.value))) {
+          await request.put(`/accounts/admin/${editingUser.value.id}/role`, { roles: selectedRoles })
         }
       }
       ElMessage.success('用户更新成功')
@@ -1005,6 +1028,44 @@ onMounted(() => {
   font-weight: 500;
 }
 
+.role-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 0;
+}
+
+.role-tag {
+  max-width: 100%;
+  height: auto;
+  min-height: 24px;
+  white-space: normal;
+}
+
+.role-tag-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  line-height: 1.25;
+}
+
+.highest-role-marker {
+  padding-left: 5px;
+  border-left: 1px solid currentColor;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.78;
+  white-space: nowrap;
+}
+
+.empty-role {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
 .pagination-container {
   display: flex;
   justify-content: center;
@@ -1276,6 +1337,20 @@ onMounted(() => {
     height: 20px;
     line-height: 18px;
   }
+
+  .role-tags {
+    gap: 4px;
+  }
+
+  .role-tags .role-tag {
+    height: auto;
+    min-height: 22px;
+    line-height: 1.2;
+  }
+
+  .highest-role-marker {
+    font-size: 9px;
+  }
   
   /* 下拉菜单按钮 */
   .mobile-actions .el-button {
@@ -1311,6 +1386,10 @@ onMounted(() => {
 .user-form .el-form-item__label {
   font-weight: 500;
   color: #606266;
+}
+
+.user-form :deep(.el-select__wrapper) {
+  min-height: 40px;
 }
 
 .dialog-footer {
@@ -1412,5 +1491,23 @@ onMounted(() => {
   .user-form .el-switch__label {
     font-size: 12px;
   }
+}
+</style>
+
+<style>
+#app .user-management .el-table th.el-table-fixed-column--right {
+  background: rgb(248, 250, 252) !important;
+}
+
+#app .user-management .el-table td.el-table-fixed-column--right {
+  background: rgb(255, 255, 255) !important;
+}
+
+#app .user-management .el-table__body tr.el-table__row--striped > td.el-table-fixed-column--right {
+  background: rgb(250, 252, 253) !important;
+}
+
+#app .user-management .el-table__body tr:hover > td.el-table-fixed-column--right {
+  background: rgb(236, 250, 255) !important;
 }
 </style>

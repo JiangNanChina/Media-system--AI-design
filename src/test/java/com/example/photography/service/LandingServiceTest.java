@@ -103,6 +103,16 @@ class LandingServiceTest {
         verify(fileUploadUtil, never()).deleteFile(anyString());
     }
 
+    @Test
+    void publicContentIncludesEveryEditableHeroAndNavigationLabel() {
+        Map<String, String> settings = service.getPublicContent().getSettings();
+
+        assertThat(settings)
+                .containsEntry(SiteConfig.Keys.SITE_SUBTITLE, "")
+                .containsEntry(SiteConfig.Keys.LANDING_NAV_JOIN_LABEL, "加入我们")
+                .containsEntry(SiteConfig.Keys.LANDING_HERO_JOIN_CTA, "加入我们");
+    }
+
     private LandingContentItem landingItem(Long id, String mediaUrl) {
         LandingContentItem item = new LandingContentItem();
         item.setId(id);

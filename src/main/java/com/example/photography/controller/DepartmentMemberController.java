@@ -69,6 +69,7 @@ public class DepartmentMemberController {
         result.put("id", user.getId()); result.put("username", user.getUsername());
         result.put("realName", user.getRealName()); result.put("email", user.getEmail());
         result.put("phone", user.getPhone()); result.put("role", user.getRole());
+        result.put("roles", user.getRoles());
         result.put("enabled", user.getEnabled());
         result.put("departmentName", user.getDepartment() == null ? null : user.getDepartment().getName());
         return result;

@@ -1,15 +1,32 @@
 <template>
   <div class="qr-scanner">
-    <div v-if="!hasCamera" class="no-camera">
-      <el-icon size="48" color="#f56c6c"><Camera /></el-icon>
-      <p>无法访问摄像头，请检查权限设置</p>
-    </div>
-    
-    <div v-else class="scanner-container">
-      <div v-if="!scanning" class="scanner-ready-overlay">
-        <el-icon size="64" color="#409eff"><Camera /></el-icon>
-        <p>准备开始扫描二维码</p>
-        <p class="scanner-hint">请确保允许浏览器访问摄像头</p>
+    <el-alert
+      v-if="!isSecure || scanError"
+      class="scanner-alert"
+      :title="scanError || '当前页面不是安全上下文，浏览器会禁止摄像头。请使用 HTTPS 访问，或从相册选择二维码。'"
+      type="warning"
+      :closable="false"
+      show-icon
+    />
+
+    <div
+      class="scanner-container"
+      :class="{ 'is-scanning': scanning, 'is-unavailable': !hasCamera }"
+    >
+      <div v-if="!hasCamera" class="scanner-empty-state">
+        <span class="scanner-icon-shell is-error" aria-hidden="true">
+          <el-icon><Camera /></el-icon>
+        </span>
+        <strong>摄像头暂不可用</strong>
+        <p>{{ cameraUnavailableHint }}</p>
+      </div>
+
+      <div v-if="hasCamera && !scanning" class="scanner-ready-overlay">
+        <span class="scanner-icon-shell" aria-hidden="true">
+          <el-icon><Camera /></el-icon>
+        </span>
+        <strong>扫描现场二维码</strong>
+        <p>点击下方按钮，按提示开启摄像头权限</p>
       </div>
       
       <video
@@ -23,20 +40,24 @@
       
       <div v-if="scanning" class="scanner-overlay">
         <div class="scanner-frame"></div>
-        <p class="scanner-tip">请将二维码对准扫描框</p>
+        <p class="scanner-tip">将二维码完整放入扫描框</p>
       </div>
       
       <canvas ref="canvasRef" style="display: none;"></canvas>
     </div>
     
-    <div class="scanner-actions">
-      <el-button @click="startScan" :disabled="scanning || !canRequestCamera" type="primary">
-        {{ scanning ? '扫描中...' : '开始扫描' }}
-      </el-button>
-      <el-button @click="stopScan" :disabled="!scanning">
-        停止扫描
+    <div class="scanner-actions" :class="{ 'is-gallery-only': !canRequestCamera }">
+      <el-button
+        v-if="canRequestCamera"
+        class="camera-action"
+        :type="scanning ? 'danger' : 'primary'"
+        @click="scanning ? stopScan() : startScan()"
+      >
+        <el-icon><VideoPause v-if="scanning" /><Camera v-else /></el-icon>
+        {{ scanning ? '停止扫描' : (scanError ? '重试摄像头' : '开始扫描') }}
       </el-button>
       <el-upload
+        class="gallery-upload"
         action="#"
         :auto-upload="false"
         :show-file-list="false"
@@ -44,16 +65,20 @@
         capture="environment"
         @change="onImagePicked"
       >
-        <el-button>从相册选择二维码</el-button>
+        <el-button class="gallery-action">
+          <el-icon><Picture /></el-icon>
+          从相册识别
+        </el-button>
       </el-upload>
     </div>
+    <p class="scanner-privacy-note">二维码仅在当前设备识别，不会保存所选图片</p>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Camera } from '@element-plus/icons-vue'
+import { Camera, Picture, VideoPause } from '@element-plus/icons-vue'
 import jsQR from 'jsqr'
 
 const emit = defineEmits(['success', 'error'])
@@ -61,16 +86,31 @@ const emit = defineEmits(['success', 'error'])
 const videoRef = ref()
 const canvasRef = ref()
 const hasCamera = ref(false)
+const cameraSupported = ref(false)
 const scanning = ref(false)
 let stream = null
 let scanInterval = null
 const scanError = ref('')
 const isSecure = window.isSecureContext || location.protocol === 'https:' || ['localhost','127.0.0.1'].includes(location.hostname)
-const canRequestCamera = computed(() => hasCamera.value && isSecure)
+const canRequestCamera = computed(() => cameraSupported.value && isSecure)
+const cameraUnavailableHint = computed(() => {
+  if (!cameraSupported.value) return '当前浏览器不支持摄像头，可从相册选择二维码图片'
+  if (!isSecure) return '当前页面无法调用摄像头，可从相册选择二维码图片'
+  return '请检查浏览器或系统相机权限，也可以直接从相册识别'
+})
+
+const beginFrameScan = () => {
+  if (!scanInterval && videoRef.value?.readyState >= 2) {
+    scanInterval = setInterval(scanQRCode, 100)
+  }
+}
 
 const startScan = async () => {
   try {
     scanError.value = ''
+    if (!isSecure) {
+      throw new DOMException('Camera access requires HTTPS', 'SecurityError')
+    }
     scanning.value = true // 先设置状态，确保视频元素可见
     
     // 等待DOM更新
@@ -94,10 +134,10 @@ const startScan = async () => {
     videoRef.value.srcObject = stream
     hasCamera.value = true
     
-    // 等待视频开始播放后再开始扫描
-    videoRef.value.addEventListener('loadedmetadata', () => {
-      scanInterval = setInterval(scanQRCode, 100)
-    })
+    // 部分浏览器在监听器注册前就已经触发 loadedmetadata，需同时覆盖两种时序。
+    videoRef.value.addEventListener('loadedmetadata', beginFrameScan, { once: true })
+    await videoRef.value.play()
+    beginFrameScan()
     
   } catch (error) {
     console.error('无法访问摄像头:', error)
@@ -114,6 +154,10 @@ const stopScan = () => {
     stream.getTracks().forEach(track => track.stop())
     stream = null
   }
+
+  if (videoRef.value) {
+    videoRef.value.srcObject = null
+  }
   
   if (scanInterval) {
     clearInterval(scanInterval)
@@ -128,6 +172,7 @@ const onImagePicked = async (fileEvent) => {
   try {
     const file = fileEvent?.raw || fileEvent?.target?.files?.[0]
     if (!file) return
+    if (scanning.value) stopScan()
     const img = await readImage(file)
     const canvas = canvasRef.value
     const ctx = canvas.getContext('2d')
@@ -181,6 +226,8 @@ const scanQRCode = () => {
   const video = videoRef.value
   const canvas = canvasRef.value
   const context = canvas.getContext('2d')
+
+  if (video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return
   
   canvas.width = video.videoWidth
   canvas.height = video.videoHeight
@@ -199,12 +246,16 @@ const scanQRCode = () => {
 onMounted(() => {
   // 检查是否支持摄像头
   if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    cameraSupported.value = true
     hasCamera.value = true
     if (!isSecure) {
+      scanError.value = '当前页面不是 HTTPS，浏览器禁止摄像头。请使用 HTTPS 访问，或从相册选择二维码'
       ElMessage.warning('建议使用HTTPS或本地localhost访问，否则部分浏览器将禁用摄像头')
     }
   } else {
+    cameraSupported.value = false
     hasCamera.value = false
+    scanError.value = '当前浏览器不支持摄像头，请从相册选择二维码'
     ElMessage.error('您的浏览器不支持摄像头功能')
   }
 })
@@ -218,113 +269,160 @@ onUnmounted(() => {
 .qr-scanner {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 16px;
+  gap: var(--spacing-4);
+  width: 100%;
   text-align: center;
+}
+
+.scanner-alert {
+  text-align: left;
+}
+
+.scanner-alert :deep(.el-alert) {
+  align-items: flex-start;
+}
+
+.scanner-alert :deep(.el-alert__title) {
+  line-height: 1.5;
 }
 
 .scanner-container {
   position: relative;
-  display: block;
-  border-radius: 12px;
+  width: 100%;
+  aspect-ratio: 4 / 3;
   overflow: hidden;
-  width: 320px;
-  max-width: 90vw;
-  aspect-ratio: 1 / 1;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  background: var(--color-primary-50);
+  border: 1px solid var(--color-primary-100);
+  border-radius: var(--radius-lg);
 }
 
 .scanner-video {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  background: #000;
+  background: #071722;
 }
 
 .scanner-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  background: rgba(3, 17, 27, 0.18);
 }
 
 .scanner-frame {
-  width: 70%;
+  width: min(58%, 220px);
   aspect-ratio: 1 / 1;
-  border: 2px solid #409eff;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.08);
+  border: 3px solid rgba(255, 255, 255, 0.94);
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 999px rgba(4, 21, 32, 0.36);
 }
 
 .scanner-tip {
-  color: white;
-  margin-top: 16px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  z-index: 1;
+  margin: var(--spacing-3) 0 0;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(3, 17, 27, 0.62);
 }
 
-.no-camera,
-.scanner-ready {
-  padding: 40px;
-  color: #909399;
-  text-align: center;
-}
-
-.scanner-ready {
-  color: #409eff;
-}
-
-.scanner-ready-overlay {
+.scanner-ready-overlay,
+.scanner-empty-state {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.92);
-  z-index: 10;
+  padding: var(--spacing-6);
+  background: var(--color-background-soft);
+  z-index: 2;
 }
 
-.scanner-hint {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 8px;
+.scanner-icon-shell {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--spacing-3);
+  color: var(--color-primary-600);
+  background: var(--color-primary-100);
+  border-radius: var(--radius-md);
+}
+
+.scanner-icon-shell.is-error {
+  color: #b73548;
+  background: #fff0f3;
+}
+
+.scanner-icon-shell .el-icon {
+  font-size: 28px;
+}
+
+.scanner-ready-overlay strong,
+.scanner-empty-state strong {
+  color: var(--color-text-primary);
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.scanner-ready-overlay p,
+.scanner-empty-state p {
+  max-width: 30ch;
+  margin: var(--spacing-2) 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .scanner-actions {
-  width: 100%;
-  max-width: 320px;
-  margin-top: 4px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-3);
+  width: 100%;
+}
+
+.scanner-actions.is-gallery-only {
+  grid-template-columns: 1fr;
 }
 
 .scanner-actions :deep(.el-button) {
   width: 100%;
+  height: 44px;
+  margin: 0;
+  border-radius: var(--radius-md);
+  font-weight: 650;
 }
 
-.scanner-actions :deep(.el-upload) {
+.gallery-upload,
+.gallery-upload :deep(.el-upload) {
   width: 100%;
 }
 
-.scanner-actions :deep(.el-upload .el-button) {
-  width: 100%;
+.scanner-privacy-note {
+  margin: calc(var(--spacing-2) * -1) 0 0;
+  color: var(--color-text-placeholder);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 @media (max-width: 420px) {
   .scanner-container {
-    border-radius: 10px;
+    aspect-ratio: 1 / 1;
   }
-  .scanner-frame {
-    border-radius: 10px;
+
+  .scanner-actions {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-2);
+  }
+
+  .scanner-ready-overlay,
+  .scanner-empty-state {
+    padding: var(--spacing-4);
   }
 }
 </style>

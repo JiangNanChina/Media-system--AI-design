@@ -17,6 +17,8 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
+        jdbc:
+          time_zone: Asia/Shanghai
     open-in-view: false
     
   # 文件上传配置
@@ -32,6 +34,7 @@ spring:
       
   # Jackson配置
   jackson:
+    time-zone: Asia/Shanghai
     serialization:
       fail-on-empty-beans: false
       write-dates-as-timestamps: false
@@ -43,6 +46,12 @@ spring:
 jwt:
   expiration: 900000 # 15分钟
   refresh-expiration: 604800000 # 7天
+
+# 晚自习动态二维码：前端提前轮换，旧码在自身有效期内保留短暂提交窗口。
+checkin:
+  qr:
+    validity-seconds: 90
+    refresh-after-seconds: 45
 
 # 应用配置
 app:
@@ -65,6 +74,10 @@ server:
   port: 8080
   servlet:
     context-path: /api  # 为所有接口添加 /api 前缀，与前端请求路径匹配
+  tomcat:
+    # 与 multipart 上限保持一致，避免容器先于 Spring 拒绝大文件表单。
+    max-http-form-post-size: 510MB
+    max-swallow-size: 510MB
   compression:
     enabled: true
     mime-types: text/html,text/xml,text/plain,text/css,text/javascript,application/javascript,application/json,image/svg+xml

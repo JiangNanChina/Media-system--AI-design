@@ -8,6 +8,7 @@ import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 
 import App from './App.vue'
 import routes, { setupRouterGuards } from './router/index.js'
+import { setupMessageTheme } from './utils/messageTheme.js'
 import { setupRouteTransitions } from './utils/routeTransition.js'
 import './style.css'
 
@@ -17,6 +18,8 @@ const router = createRouter({
   history: createWebHistory(),
   routes
 })
+
+setupMessageTheme(router)
 
 // 注册Element Plus图标
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {

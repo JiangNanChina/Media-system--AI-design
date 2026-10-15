@@ -29,70 +29,87 @@
       </div>
     </div>
 
-    <el-table v-loading="loading" :data="rows" row-key="id" empty-text="暂无入部申请">
-      <el-table-column prop="applicationNumber" label="申请编号" min-width="170" />
-      <el-table-column label="申请人" min-width="170">
-        <template #default="{ row }">
-          <strong>{{ row.realName }}</strong>
-          <small>{{ row.qqEmail }}</small>
-          <small>{{ row.phone }}</small>
-        </template>
-      </el-table-column>
-      <el-table-column label="基本信息" min-width="170">
-        <template #default="{ row }">
-          {{ row.genderDescription || '-' }}
-          <small>{{ row.enrollmentYear }} 级</small>
-        </template>
-      </el-table-column>
-      <el-table-column label="学院专业" min-width="200">
-        <template #default="{ row }">
-          {{ row.college }}
-          <small>{{ row.major }}</small>
-        </template>
-      </el-table-column>
-      <el-table-column label="作品" width="120">
-        <template #default="{ row }">
-          <el-button v-if="row.hasWork" text type="primary" @click="downloadWork(row)">
-            <el-icon><Download /></el-icon>
-            下载
-          </el-button>
-          <span v-else class="muted">未上传</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="状态" width="120">
-        <template #default="{ row }">
-          <el-tag :type="tagType(row.status)">{{ statusText(row.status) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="通知" width="130">
-        <template #default="{ row }">
-          <el-tag v-if="row.status === 'INTERVIEW'" :type="row.notificationSent ? 'success' : 'warning'">
-            {{ row.notificationSent ? '已发送' : '发送失败' }}
-          </el-tag>
-          <span v-else class="muted">-</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="230" fixed="right">
-        <template #default="{ row }">
-          <el-button text type="primary" @click="openDetail(row)">
-            <el-icon><View /></el-icon>
-            详情
-          </el-button>
-          <el-button v-if="row.status === 'PENDING'" text type="primary" @click="openReview(row)">
-            <el-icon><DocumentChecked /></el-icon>
-            审核
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="management-table-panel">
+      <el-table v-loading="loading" :data="rows" row-key="id" empty-text="暂无入部申请">
+        <el-table-column prop="applicationNumber" label="申请编号" min-width="170" />
+        <el-table-column label="申请人" min-width="170">
+          <template #default="{ row }">
+            <strong>{{ row.realName }}</strong>
+            <small>{{ row.qqEmail }}</small>
+            <small>{{ row.phone }}</small>
+          </template>
+        </el-table-column>
+        <el-table-column label="基本信息" min-width="170">
+          <template #default="{ row }">
+            {{ row.genderDescription || '-' }}
+            <small>{{ row.enrollmentYear }} 级 · {{ row.className || '班级未填写' }}</small>
+          </template>
+        </el-table-column>
+        <el-table-column label="学院专业" min-width="200">
+          <template #default="{ row }">
+            {{ row.college }}
+            <small>{{ row.major }}</small>
+          </template>
+        </el-table-column>
+        <el-table-column label="作品" width="120">
+          <template #default="{ row }">
+            <el-button v-if="row.hasWork" text type="primary" @click="downloadWork(row)">
+              <el-icon><Download /></el-icon>
+              下载
+            </el-button>
+            <span v-else class="muted">未上传</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="120">
+          <template #default="{ row }">
+            <el-tag :type="tagType(row.status)">{{ statusText(row.status) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="通知" width="130">
+          <template #default="{ row }">
+            <el-tag v-if="row.status === 'INTERVIEW'" :type="row.notificationSent ? 'success' : 'warning'">
+              {{ row.notificationSent ? '已发送' : '发送失败' }}
+            </el-tag>
+            <span v-else class="muted">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="310" fixed="right">
+          <template #default="{ row }">
+            <el-button text type="primary" @click="openDetail(row)">
+              <el-icon><View /></el-icon>
+              详情
+            </el-button>
+            <el-button v-if="row.status === 'PENDING'" text type="primary" @click="openReview(row)">
+              <el-icon><DocumentChecked /></el-icon>
+              审核
+            </el-button>
+            <el-button
+              v-if="userStore.isSuperAdmin"
+              text
+              type="danger"
+              title="永久删除"
+              :loading="deletingId === row.id"
+              :disabled="deletingId !== null && deletingId !== row.id"
+              @click="deleteApplication(row)"
+            >
+              <el-icon><Delete /></el-icon>
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
 
-    <el-pagination
-      v-model:current-page="page"
-      v-model:page-size="size"
-      :total="total"
-      layout="total, prev, pager, next"
-      @current-change="load"
-    />
+      <div class="management-table-footer">
+        <el-pagination
+          background
+          v-model:current-page="page"
+          v-model:page-size="size"
+          :total="total"
+          layout="total, prev, pager, next"
+          @current-change="load"
+        />
+      </div>
+    </div>
 
     <el-dialog v-model="detailVisible" title="申请详情" width="min(720px, 94vw)">
       <el-descriptions v-if="current" :column="1" border>
@@ -103,6 +120,7 @@
         <el-descriptions-item label="性别">{{ current.genderDescription }}</el-descriptions-item>
         <el-descriptions-item label="学院专业">{{ current.college }} / {{ current.major }}</el-descriptions-item>
         <el-descriptions-item label="入学年份">{{ current.enrollmentYear }}</el-descriptions-item>
+        <el-descriptions-item label="班级">{{ current.className || '未填写' }}</el-descriptions-item>
         <el-descriptions-item label="自我介绍">
           <p class="intro-text">{{ current.selfIntroduction }}</p>
         </el-descriptions-item>
@@ -129,6 +147,7 @@
       <el-descriptions v-if="current" :column="1" border>
         <el-descriptions-item label="申请人">{{ current.realName }}</el-descriptions-item>
         <el-descriptions-item label="学院专业">{{ current.college }} / {{ current.major }}</el-descriptions-item>
+        <el-descriptions-item label="年级班级">{{ current.enrollmentYear }} 级 / {{ current.className || '未填写' }}</el-descriptions-item>
         <el-descriptions-item label="当前面试群">{{ interviewGroup || '未配置' }}</el-descriptions-item>
       </el-descriptions>
       <el-form label-position="top" class="review-form">
@@ -146,14 +165,17 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { DocumentChecked, Download, Refresh, View } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { Delete, DocumentChecked, Download, Refresh, View } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useUserStore } from '@/stores/user'
 import request from '@/utils/request'
 
+const userStore = useUserStore()
 const rows = ref([])
 const loading = ref(false)
 const reviewing = ref(false)
 const savingGroup = ref(false)
+const deletingId = ref(null)
 const status = ref('')
 const page = ref(1)
 const size = ref(10)
@@ -251,6 +273,34 @@ const downloadWork = async row => {
   URL.revokeObjectURL(url)
 }
 
+const deleteApplication = async row => {
+  try {
+    await ElMessageBox.confirm(
+      `确定永久删除 ${row.realName} 的入部申请吗？数据库记录和服务器中的作品文件将一并删除并释放存储空间，此操作不可恢复。`,
+      '永久删除入部申请',
+      {
+        customClass: 'delete-confirm-message-box',
+        type: 'error',
+        confirmButtonText: '永久删除',
+        confirmButtonClass: 'el-button--danger',
+        cancelButtonText: '取消'
+      }
+    )
+  } catch {
+    return
+  }
+
+  deletingId.value = row.id
+  try {
+    await request.delete(`/join-applications/${row.id}`)
+    ElMessage.success('入部申请及服务器作品文件已永久删除')
+    if (rows.value.length === 1 && page.value > 1) page.value -= 1
+    await load()
+  } finally {
+    deletingId.value = null
+  }
+}
+
 const statusText = value => ({ PENDING: '待审核', INTERVIEW: '进入面试', REJECTED: '已驳回' })[value] || value
 const tagType = value => ({ PENDING: 'warning', INTERVIEW: 'success', REJECTED: 'danger' })[value] || 'info'
 
@@ -322,16 +372,6 @@ small {
 
 .group-editor .el-input {
   width: 220px;
-}
-
-.el-table {
-  border: 1px solid #dce8ed;
-  border-radius: 6px;
-}
-
-.el-pagination {
-  justify-content: flex-end;
-  margin-top: 20px;
 }
 
 .intro-text {

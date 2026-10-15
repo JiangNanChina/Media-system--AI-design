@@ -6,6 +6,8 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+    hikari:
+      connection-init-sql: SET time_zone = '+08:00'
   jpa:
     hibernate:
       ddl-auto: validate
@@ -13,6 +15,12 @@ spring:
 
 jwt:
   secret: ${JWT_SECRET}
+
+checkin:
+  qr:
+    secret: ${CHECKIN_QR_SECRET:${JWT_SECRET}}
+    validity-seconds: 90
+    refresh-after-seconds: 45
 
 app:
   security:

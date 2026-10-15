@@ -678,7 +678,7 @@ public class DutyServiceImpl implements DutyService {
         }
 
         // 校验发起人权限：普通用户只能对自己的排班发起申请，管理员可以代为发起
-        boolean isAdmin = operator.getRole() != null && operator.getRole().name().contains("ADMIN");
+        boolean isAdmin = operator.isSuperAdmin();
         if (!isAdmin && !realRequester.getId().equals(requesterId)) {
             throw new RuntimeException("只能对自己的排班发起调换申请");
         }
@@ -715,7 +715,7 @@ public class DutyServiceImpl implements DutyService {
         // 只有被调换人或管理员才能处理
         User operator = userService.findById(operatorId);
         boolean isTargetUser = swapRequest.getTargetUser().getId().equals(operatorId);
-        boolean isAdmin = operator.getRole() != null && operator.getRole().name().contains("ADMIN");
+        boolean isAdmin = operator.isSuperAdmin();
         if (!isTargetUser && !isAdmin) {
             throw new RuntimeException("只有被调换人或管理员可以处理该申请");
         }

@@ -6,18 +6,27 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
 
 /**
  * 用户Repository
  */
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
+
+    /**
+     * 串行化同一用户的设备绑定，避免两个首次登录请求同时占用一个设备槽位。
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT u FROM User u WHERE u.id = :id AND u.deleted = false")
+    Optional<User> findByIdForDeviceBinding(@Param("id") Long id);
     
     /**
      * 根据用户名查找用户
@@ -68,7 +77,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /**
      * 根据角色查找用户
      */
-    List<User> findByRoleAndDeletedFalse(UserRole role);
+    @Query("SELECT DISTINCT u FROM User u JOIN u.roles r WHERE r = :role AND u.deleted = false")
+    List<User> findByRoleAndDeletedFalse(@Param("role") UserRole role);
     
     /**
      * 根据部门ID查找用户
@@ -118,7 +128,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      */
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.department d WHERE u.deleted = false " +
            "AND (:keyword IS NULL OR u.username LIKE %:keyword% OR u.realName LIKE %:keyword% OR u.email LIKE %:keyword%) " +
-           "AND (:role IS NULL OR u.role = :role) " +
+           "AND (:role IS NULL OR :role MEMBER OF u.roles) " +
            "AND (:departmentId IS NULL OR u.department.id = :departmentId) " +
            "AND (:enabled IS NULL OR u.enabled = :enabled)")
     Page<User> searchUsersWithFilters(@Param("keyword") String keyword,
@@ -130,12 +140,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /**
      * 根据部门和角色查找用户
      */
-    List<User> findByDepartmentIdAndRoleAndDeletedFalse(Long departmentId, UserRole role);
+    @Query("SELECT DISTINCT u FROM User u JOIN u.roles r " +
+           "WHERE u.department.id = :departmentId AND r = :role AND u.deleted = false")
+    List<User> findByDepartmentIdAndRoleAndDeletedFalse(@Param("departmentId") Long departmentId,
+                                                         @Param("role") UserRole role);
     
     /**
      * 根据角色查找用户（包含部门信息）
      */
-    @Query("SELECT u FROM User u LEFT JOIN FETCH u.department WHERE u.role = :role AND u.deleted = false")
+    @Query("SELECT DISTINCT u FROM User u JOIN u.roles r LEFT JOIN FETCH u.department " +
+           "WHERE r = :role AND u.deleted = false")
     List<User> findByRoleWithDepartment(@Param("role") UserRole role);
     
     /**
@@ -152,7 +166,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /**
      * 统计各角色用户数量
      */
-    long countByRoleAndDeletedFalse(UserRole role);
+    @Query("SELECT COUNT(DISTINCT u) FROM User u JOIN u.roles r WHERE r = :role AND u.deleted = false")
+    long countByRoleAndDeletedFalse(@Param("role") UserRole role);
     
     /**
      * 获取所有激活的未删除用户（按姓名排序，包含部门信息）

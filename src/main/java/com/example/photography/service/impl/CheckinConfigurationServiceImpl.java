@@ -264,7 +264,7 @@ public class CheckinConfigurationServiceImpl implements CheckinConfigurationServ
     @Override
     @Transactional(readOnly = true)
     public List<CheckinConfigurationResponse> getActiveConfigurations() {
-        List<CheckinConfiguration> configurations = configurationRepository.findByIsActiveTrueAndDeletedFalseOrderBySortOrderAsc();
+        List<CheckinConfiguration> configurations = configurationRepository.findAllActiveWithUsers();
         return configurations.stream()
             .map(CheckinConfigurationResponse::fromEntity)
             .collect(Collectors.toList());

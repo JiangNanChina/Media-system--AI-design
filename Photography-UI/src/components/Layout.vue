@@ -445,7 +445,7 @@ const menuItems = [
 // 过滤菜单路由（根据用户权限）
 const menuRoutes = computed(() => {
   const allowed = (meta = {}) => {
-    if (meta.roles?.length && !meta.roles.includes(userStore.role)) return false
+    if (meta.roles?.length && !userStore.hasAnyRole(meta.roles)) return false
     if (meta.requiresAdmin && !userStore.canManageBusiness) return false
     return true
   }

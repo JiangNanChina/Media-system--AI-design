@@ -4,33 +4,17 @@
 
 ## 📁 脚本文件说明
 
-### 1. `production_init.sql` - 生产环境推荐 ⭐
-- **适用场景**: 生产环境、正式部署
+### 1. `init_database.sql` - 当前版本推荐 ⭐
+- **适用场景**: 生产环境、正式部署、开发测试
 - **特点**: 
-  - 完整的表结构定义
-  - 详细的字段注释
-  - 完善的索引和约束
-  - 基础示例数据
-  - 安全的外键约束
+  - 与当前 Spring Boot 实体及 `ddl-auto: validate` 保持一致
+  - 包含多角色关联表、完整索引和外键约束
+  - 可重复执行并保留已有业务数据
 - **推荐指数**: ⭐⭐⭐⭐⭐
 
-### 2. `simple_init.sql` - 快速开始
-- **适用场景**: 开发测试、快速体验
-- **特点**:
-  - 简化的表结构
-  - 基本的索引
-  - 必要的初始数据
-  - 快速执行
-- **推荐指数**: ⭐⭐⭐⭐
-
-### 3. `init_database.sql` - 功能完整
-- **适用场景**: 完整功能展示、高级用户
-- **特点**:
-  - 包含视图和存储过程
-  - 数据库触发器
-  - 高级统计功能
-  - 完整的示例数据
-- **推荐指数**: ⭐⭐⭐
+### 2. `production_init.sql` / `simple_init.sql` - 旧版参考
+- **适用场景**: 仅用于查看早期表结构，不用于部署当前版本
+- **说明**: 两个脚本未覆盖当前完整实体模型，生产配置会因结构校验失败而拒绝启动
 
 ## 🚀 快速部署步骤
 
@@ -45,12 +29,17 @@ mysql -u root -p
 
 ### 步骤2: 执行初始化脚本
 ```sql
--- 推荐使用生产环境脚本
-source /path/to/docs/production_init.sql;
-
--- 或者使用简化版本
-source /path/to/docs/simple_init.sql;
+-- 当前版本统一使用可重复执行的完整初始化脚本
+source /path/to/docs/init_database.sql;
 ```
+
+已有数据库升级到设备识别增强版本时，需在启动后端前执行：
+
+```bash
+mysql photography_system < docs/migration/008_add_device_hardware_fingerprint_mysql57_mysql8.sql
+```
+
+该迁移为可重复执行，会新增 `user_devices.hardware_fingerprint` 及索引。
 
 ### 步骤3: 验证安装
 ```sql
@@ -63,6 +52,7 @@ SHOW TABLES;
 
 -- 验证数据
 SELECT COUNT(*) FROM users;
+SELECT COUNT(*) FROM user_roles;
 SELECT COUNT(*) FROM departments;
 ```
 
@@ -84,8 +74,8 @@ spring:
 ### 管理员账户
 - **用户名**: `admin`
 - **密码**: `123456`
-- **角色**: 管理员
-- **邮箱**: `admin@photography.com`
+- **角色**: 系统超级管理员
+- **邮箱**: `admin@photography.local`
 
 > ⚠️ **安全提示**: 首次登录后请立即修改默认密码！
 

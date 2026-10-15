@@ -22,6 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -90,8 +91,11 @@ public class MediaSubmissionService {
             entity.setMimeType(metadata.mimeType());
             entity.setFileSize(file.getSize());
             MediaSubmission saved = repository.save(entity);
-            sendSafely(saved.getQqEmail(), "视频投稿已收到",
-                    "您的投稿编号为 <strong>" + saved.getSubmissionNumber() + "</strong>，审核结果将通过邮箱通知。");
+            sendSafely(saved.getQqEmail(), "视频投稿已收到", EmailTemplateRenderer.renderNotification(
+                    "视频投稿已收到",
+                    "投稿编号：" + saved.getSubmissionNumber(),
+                    "您的投稿已经进入审核队列，审核结果将通过邮箱通知。"
+            ));
             return MediaSubmissionResponse.from(saved);
         } catch (RuntimeException e) {
             try { Files.deleteIfExists(target); } catch (IOException ignored) { }
@@ -120,7 +124,7 @@ public class MediaSubmissionService {
         MediaSubmission entity = findEntity(id);
         User reviewer = userRepository.findById(reviewerId)
                 .orElseThrow(() -> new IllegalArgumentException("审核人不存在"));
-        if (!reviewer.getRole().canReviewSubmission()) {
+        if (!reviewer.canReviewSubmission()) {
             throw new org.springframework.security.access.AccessDeniedException("无投稿审核权限");
         }
         entity.setStatus(request.getStatus());
@@ -129,20 +133,39 @@ public class MediaSubmissionService {
         entity.setReviewedAt(LocalDateTime.now());
         MediaSubmission saved = repository.save(entity);
         String result = saved.getStatus() == SubmissionStatus.APPROVED ? "已通过" : "未通过";
-        sendSafely(saved.getQqEmail(), "视频投稿审核结果",
-                "投稿 <strong>" + saved.getSubmissionNumber() + "</strong> " + result + "。<br>反馈："
-                        + escapeHtml(Objects.requireNonNullElse(saved.getReviewFeedback(), "无")));
+        sendSafely(saved.getQqEmail(), "视频投稿审核结果", EmailTemplateRenderer.renderNotification(
+                "视频投稿审核结果",
+                "投稿编号：" + saved.getSubmissionNumber(),
+                "审核结果：" + result,
+                "审核反馈：" + Objects.requireNonNullElse(saved.getReviewFeedback(), "无"),
+                "投稿审核已经完成，请查收本次处理结果。"
+        ));
         return MediaSubmissionResponse.from(saved);
+    }
+
+    public void deletePermanently(Long id) {
+        MediaSubmission entity = findEntity(id);
+        Path videoPath = resolveStoredVideo(entity.getStoredFilename());
+
+        try {
+            Files.deleteIfExists(videoPath);
+        } catch (IOException e) {
+            log.error("投稿视频文件删除失败，保留数据库记录: id={}, submissionNumber={}, path={}",
+                    entity.getId(), entity.getSubmissionNumber(), videoPath, e);
+            throw new UncheckedIOException("服务器中的投稿视频删除失败，数据库记录未删除", e);
+        }
+
+        repository.delete(entity);
+        repository.flush();
+        log.info("已永久删除视频投稿及服务器文件: id={}, submissionNumber={}, path={}",
+                entity.getId(), entity.getSubmissionNumber(), videoPath);
     }
 
     @Transactional(readOnly = true)
     public Resource loadVideo(Long id) {
         MediaSubmission entity = findEntity(id);
         try {
-            Path path = submissionDirectory.resolve(entity.getStoredFilename()).normalize();
-            if (!path.startsWith(submissionDirectory)) {
-                throw new IllegalArgumentException("非法文件路径");
-            }
+            Path path = resolveStoredVideo(entity.getStoredFilename());
             Resource resource = new UrlResource(path.toUri());
             if (!resource.exists() || !resource.isReadable()) {
                 throw new IllegalArgumentException("投稿视频文件不存在");
@@ -153,14 +176,36 @@ public class MediaSubmissionService {
         }
     }
 
+    private Path resolveStoredVideo(String storedFilename) {
+        if (!StringUtils.hasText(storedFilename)) {
+            throw new IllegalArgumentException("投稿视频文件记录无效");
+        }
+        Path filename = Paths.get(storedFilename);
+        if (filename.isAbsolute() || filename.getNameCount() != 1) {
+            throw new IllegalArgumentException("非法文件路径");
+        }
+        Path path = submissionDirectory.resolve(filename).normalize();
+        if (!submissionDirectory.equals(path.getParent())) {
+            throw new IllegalArgumentException("非法文件路径");
+        }
+        return path;
+    }
+
     private VideoMetadata validateVideo(MultipartFile file) {
         if (file == null || file.isEmpty()) throw new IllegalArgumentException("请选择投稿视频");
         if (file.getSize() > MAX_VIDEO_SIZE) throw new IllegalArgumentException("视频大小不能超过500MB");
         String original = StringUtils.cleanPath(Objects.requireNonNullElse(file.getOriginalFilename(), ""));
         if (original.contains("..")) throw new IllegalArgumentException("文件名不合法");
         String extension = Optional.ofNullable(StringUtils.getFilenameExtension(original)).orElse("").toLowerCase(Locale.ROOT);
-        if (!EXTENSIONS.contains(extension)) throw new IllegalArgumentException("仅支持MP4、MOV和WebM格式");
         String declared = Objects.requireNonNullElse(file.getContentType(), "application/octet-stream").toLowerCase(Locale.ROOT);
+        if (extension.equals("zip")) {
+            if (!UploadArchiveValidator.MIME_TYPES.contains(declared)) {
+                throw new IllegalArgumentException("压缩包MIME类型不受支持");
+            }
+            UploadArchiveValidator.validate(file, EXTENSIONS, MAX_VIDEO_SIZE);
+            return new VideoMetadata("zip", "application/zip");
+        }
+        if (!EXTENSIONS.contains(extension)) throw new IllegalArgumentException("仅支持MP4、MOV、WebM或系统生成的ZIP格式");
         if (!MIME_TYPES.contains(declared)) throw new IllegalArgumentException("视频MIME类型不受支持");
         try (InputStream input = file.getInputStream()) {
             byte[] header = input.readNBytes(16);
@@ -201,10 +246,6 @@ public class MediaSubmissionService {
     private void sendSafely(String to, String subject, String content) {
         try { emailDeliveryService.sendHtmlMail(to, subject, content); }
         catch (RuntimeException e) { log.warn("投稿通知邮件发送失败: {}", to, e); }
-    }
-
-    private String escapeHtml(String value) {
-        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     private record VideoMetadata(String extension, String mimeType) { }

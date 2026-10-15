@@ -444,7 +444,7 @@ export const setupRouterGuards = (router) => {
     }
     
     const requiredRoles = to.meta.roles || to.matched.flatMap(record => record.meta.roles || [])
-    if (requiredRoles.length && !requiredRoles.includes(userStore.role)) {
+    if (requiredRoles.length && !userStore.hasAnyRole(requiredRoles)) {
       next('/404')
       return
     }

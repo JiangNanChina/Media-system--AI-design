@@ -1,8 +1,12 @@
 package com.example.photography.dto.response;
 
 import com.example.photography.model.entity.User;
+import com.example.photography.model.enums.UserRole;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
+
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /**
  * 用户基本信息响应DTO
@@ -25,6 +29,9 @@ public class UserBasicResponse {
     
     @Schema(description = "角色")
     private String role;
+
+    @Schema(description = "全部已分配角色")
+    private Set<UserRole> roles = new LinkedHashSet<>();
     
     /**
      * 从User实体转换为基本信息响应DTO
@@ -43,6 +50,7 @@ public class UserBasicResponse {
             response.setRealName(user.getRealName());
             response.setEmail(user.getEmail());
             response.setRole(user.getRole() != null ? user.getRole().toString() : null);
+            response.setRoles(user.getRoles());
             
             return response;
         } catch (org.hibernate.LazyInitializationException e) {

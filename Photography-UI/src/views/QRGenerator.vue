@@ -103,37 +103,10 @@
                 </div>
               </el-form-item>
 
-              <el-form-item label="有效期">
-                <div style="width: 100%;">
-                  <el-date-picker
-                    v-model="form.expireTime"
-                    type="datetime"
-                    placeholder="选择过期时间（可选）"
-                    format="YYYY-MM-DD HH:mm:ss"
-                    value-format="YYYY-MM-DD HH:mm:ss"
-                    style="width: 100%;"
-                    :clearable="true"
-                    :disabled-date="(time) => time.getTime() < Date.now()"
-                  />
-                  <div class="form-item-tip">
-                    <el-icon><InfoFilled /></el-icon>
-                    <span>设置二维码的有效期限，留空则永久有效</span>
-                  </div>
-                </div>
-              </el-form-item>
-
-              <el-form-item label="附加信息">
-                <div style="width: 100%;">
-                  <el-input
-                    v-model="form.extra"
-                    type="textarea"
-                    :rows="3"
-                    placeholder="其他信息（可选）"
-                  />
-                  <div class="form-item-tip">
-                    <el-icon><InfoFilled /></el-icon>
-                    <span>可以添加备注、使用说明等额外信息</span>
-                  </div>
+              <el-form-item label="动态有效期">
+                <div class="form-item-tip qr-validity-tip">
+                  <el-icon><InfoFilled /></el-icon>
+                  <span>二维码由服务端签发，默认有效90秒，每45秒自动轮换</span>
                 </div>
               </el-form-item>
 
@@ -209,7 +182,7 @@
                     <template #icon>
                       <el-icon><Download /></el-icon>
                     </template>
-                    下载二维码
+                    下载当前二维码
                   </el-button>
                   <el-button @click="copyContent" type="primary" plain class="action-btn">
                     <template #icon>
@@ -256,10 +229,6 @@
                           {{ selectedConfig.sessionName || '-' }}
                         </span>
                       </div>
-                      <div class="info-item" v-if="form.expireTime">
-                        <span class="info-label">有效期至</span>
-                        <span class="info-value expiry-time">{{ form.expireTime }}</span>
-                      </div>
                     </div>
                   </div>
                   
@@ -267,8 +236,8 @@
                     <div class="status-item success">
                       <el-icon class="status-icon"><CircleCheck /></el-icon>
                       <div class="status-text">
-                        <div class="status-title">已自动保存</div>
-                        <div class="status-desc">二维码内容已同步到配置</div>
+                        <div class="status-title">服务端已签发</div>
+                        <div class="status-desc">当前二维码带签名并按有效期自动轮换</div>
                       </div>
                     </div>
                   </div>
@@ -310,9 +279,9 @@
             <el-steps :active="4" finish-status="success">
               <el-step title="选择配置" description="从下拉列表中选择已创建的打卡配置" />
               <el-step title="自动生成" description="系统自动生成二维码并保存到配置" />
-              <el-step title="下载打印" description="下载二维码图片并打印" />
-              <el-step title="张贴使用" description="将二维码张贴在签到地点" />
-              <el-step title="扫码签到" description="用户扫码即可完成签到" />
+              <el-step title="实时展示" description="在签到点屏幕上展示当前二维码" />
+              <el-step title="自动轮换" description="服务端每45秒签发新的二维码" />
+              <el-step title="扫码签到" description="用户扫描当前二维码完成签到" />
             </el-steps>
 
             <el-alert
@@ -324,7 +293,7 @@
             >
               <ul style="margin: 0; padding-left: 20px;">
                 <li><strong>自动保存：</strong>生成的二维码内容会自动保存到打卡配置，无需手动填写</li>
-                <li><strong>自动刷新：</strong>二维码每60秒自动刷新一次，防止作弊行为</li>
+                <li><strong>自动刷新：</strong>二维码每45秒自动轮换，旧码在90秒后过期</li>
                 <li><strong>持久化：</strong>切换页面后返回，二维码和倒计时会自动恢复</li>
                 <li><strong>一键操作：</strong>选择配置后自动生成，简化操作流程</li>
               </ul>
@@ -339,9 +308,9 @@
             >
               <ul style="margin: 0; padding-left: 20px;">
                 <li>请从列表中选择已启用的打卡配置</li>
-                <li>二维码内容包含配置信息，请妥善保管</li>
-                <li>建议定期更新二维码，提高签到安全性</li>
-                <li>可以为不同的签到点生成不同的二维码</li>
+                <li>请在签到点实时展示二维码，不要打印或使用截图</li>
+                <li>下载的二维码也会按服务端有效期自动过期</li>
+                <li>扫码后请在有效期内点击确认签到</li>
                 <li>如果列表为空，请先在"打卡配置"页面创建配置</li>
               </ul>
             </el-alert>
@@ -377,9 +346,7 @@ const selectedConfigId = ref(null)
 
 const form = reactive({
   configId: '',
-  configName: '',
-  expireTime: '',
-  extra: ''
+  configName: ''
 })
 
 // 当前选中的配置对象（计算属性）
@@ -399,6 +366,20 @@ const loadConfigurations = async () => {
     if (response && response.success !== false) {
       const data = response.data || response || []
       configList.value = Array.isArray(data) ? data : []
+
+      // 兼容旧部署：部分环境的 active 查询可能因历史 deleted 字段或缓存返回空，
+      // 用管理列表兜底，避免“配置管理可见但二维码页为空”。
+      if (configList.value.length === 0) {
+        const fallback = await request.get('/checkin/configurations', {
+          params: { page: 0, size: 100, sortBy: 'sortOrder', sortDir: 'asc' },
+          silent: true
+        })
+        const fallbackData = fallback?.data || fallback
+        const fallbackItems = Array.isArray(fallbackData)
+          ? fallbackData
+          : (fallbackData?.content || [])
+        configList.value = fallbackItems.filter(config => config?.isActive === true)
+      }
       console.log('加载配置列表成功:', configList.value)
       
       if (configList.value.length === 0) {
@@ -450,27 +431,22 @@ onMounted(() => {
 
 // 生成二维码
 const generateQR = async () => {
-  if (!form.configId.trim()) {
+  if (!form.configId?.trim()) {
     ElMessage.error('请选择打卡配置')
     return
   }
+  if (generating.value) return
 
   generating.value = true
 
   try {
-    // 构建二维码内容
-    const qrData = {
-      type: 'CHECKIN',
-      configId: Number(form.configId.trim()),
-      name: selectedConfig.value?.name || '',
-      location: selectedConfig.value?.locationName || '',
-      session: selectedConfig.value?.sessionName || '',
-      expireTime: form.expireTime || '',
-      extra: form.extra || '',
-      generateTime: new Date().toISOString()
+    // 二维码内容由服务端签发并保存，避免浏览器生成后保存失败造成“假成功”。
+    const response = await request.post(`/checkin/configurations/${form.configId}/qr-code`)
+    const qrData = response?.data
+    const content = qrData?.content
+    if (!content) {
+      throw new Error(response?.message || '服务端未返回二维码内容')
     }
-
-    const content = JSON.stringify(qrData)
     qrContent.value = content
 
     // 生成二维码
@@ -486,13 +462,10 @@ const generateQR = async () => {
     const url = await QRCode.toDataURL(content, options)
     qrCodeUrl.value = url
 
-    // 自动写入到后端配置
-    await saveQRCodeToBackend(content)
+    ElMessage.success(`二维码已生成，有效期 ${qrData.validitySeconds || 90} 秒`)
 
-    ElMessage.success('二维码生成成功并已保存到配置')
-
-    // 启动1分钟自动刷新倒计时
-    startCountdown(60)
+    // 使用服务端返回的轮换窗口，避免前后端刷新节奏不一致。
+    startCountdown(Number(qrData.refreshAfterSeconds) || 45)
     // 持久化当前二维码
     persistToStorage()
 
@@ -504,7 +477,8 @@ const generateQR = async () => {
   }
 }
 
-// 将二维码内容保存到后端配置
+/* legacy save function removed: dynamic QR codes are persisted by the server */
+/*
 const saveQRCodeToBackend = async (qrCodeContent) => {
   try {
     if (!selectedConfig.value) {
@@ -571,14 +545,13 @@ const saveQRCodeToBackend = async (qrCodeContent) => {
     // 不阻止二维码生成流程，只记录错误
   }
 }
+*/
 
 // 重置表单
 const resetForm = () => {
   selectedConfigId.value = null
   form.configId = ''
   form.configName = ''
-  form.expireTime = ''
-  form.extra = ''
   qrCodeUrl.value = ''
   qrContent.value = ''
   stopCountdown()
@@ -652,7 +625,7 @@ const progressColor = computed(() => {
 })
 
 const forceRefresh = async () => {
-  if (!form.configId) return
+  if (!form.configId || generating.value) return
   await generateQR()
 }
 
@@ -683,8 +656,6 @@ const restoreFromStorage = () => {
     // 还原表单与二维码
     form.configId = String(data.form.configId)
     form.configName = data.form.configName || ''
-    form.expireTime = data.form.expireTime || ''
-    form.extra = data.form.extra || ''
     // 保存上次生成时间（用于推断总时长）
     const lastGenerateTime = data.form?.generateTime
     selectedConfigId.value = Number(form.configId)

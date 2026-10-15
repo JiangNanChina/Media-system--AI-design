@@ -1,6 +1,7 @@
 package com.example.photography.service.impl;
 
 import com.example.photography.service.EmailDeliveryService;
+import com.example.photography.service.EmailTemplateRenderer;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import lombok.extern.slf4j.Slf4j;

@@ -10,7 +10,10 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * 用户实体
@@ -48,8 +51,14 @@ public class User extends BaseEntity {
     
     @Enumerated(EnumType.STRING)
     @NotNull(message = "用户角色不能为空")
-    @Column(name = "role", nullable = false)
+    @Column(name = "role", nullable = false, length = 20)
     private UserRole role = UserRole.MEMBER;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private Set<UserRole> roles = new LinkedHashSet<>(Set.of(UserRole.MEMBER));
     
     @Column(name = "enabled", nullable = false)
     private Boolean enabled = true;
@@ -92,7 +101,7 @@ public class User extends BaseEntity {
         this.username = username;
         this.password = password;
         this.realName = realName;
-        this.role = role;
+        setRole(role);
     }
     
     // Getters and Setters
@@ -147,11 +156,96 @@ public class User extends BaseEntity {
     }
     
     public UserRole getRole() {
-        return role;
+        return UserRole.highest(effectiveRoles());
     }
     
     public void setRole(UserRole role) {
-        this.role = role;
+        setRoles(role == null ? null : Set.of(role));
+    }
+
+    public Set<UserRole> getRoles() {
+        return new LinkedHashSet<>(UserRole.normalize(effectiveRoles()));
+    }
+
+    /**
+     * Roles that participate in authorization: only roles at the highest assigned level.
+     */
+    public Set<UserRole> getEffectiveRoles() {
+        Set<UserRole> assignedRoles = getRoles();
+        int highestLevel = UserRole.highest(assignedRoles).getLevel();
+        LinkedHashSet<UserRole> effective = new LinkedHashSet<>();
+        assignedRoles.stream()
+                .filter(candidate -> candidate.getLevel() == highestLevel)
+                .forEach(effective::add);
+        return effective;
+    }
+
+    public void setRoles(Collection<UserRole> roles) {
+        LinkedHashSet<UserRole> normalized = UserRole.normalize(roles);
+        if (this.roles == null) {
+            this.roles = normalized;
+        } else {
+            this.roles.clear();
+            this.roles.addAll(normalized);
+        }
+        syncCompatibilityRole();
+    }
+
+    public boolean hasRole(UserRole role) {
+        if (role == null) {
+            return false;
+        }
+        UserRole normalized = role.normalized();
+        return getEffectiveRoles().contains(normalized);
+    }
+
+    public boolean hasAssignedRole(UserRole role) {
+        return role != null && getRoles().contains(role.normalized());
+    }
+
+    public boolean hasAnyRole(UserRole... candidateRoles) {
+        if (candidateRoles == null) {
+            return false;
+        }
+        for (UserRole candidate : candidateRoles) {
+            if (hasRole(candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean isSuperAdmin() {
+        return hasRole(UserRole.SUPER_ADMIN) || role == UserRole.ADMIN;
+    }
+
+    public boolean canManageBusiness() {
+        return getEffectiveRoles().stream().anyMatch(UserRole::canManageBusiness);
+    }
+
+    public boolean canReviewSubmission() {
+        return getEffectiveRoles().stream().anyMatch(UserRole::canReviewSubmission);
+    }
+
+    @PostLoad
+    @PrePersist
+    @PreUpdate
+    private void syncCompatibilityRole() {
+        LinkedHashSet<UserRole> normalized = UserRole.normalize(effectiveRoles());
+        if (this.roles == null) {
+            this.roles = normalized;
+        } else if (!this.roles.equals(normalized)) {
+            this.roles.clear();
+            this.roles.addAll(normalized);
+        }
+        this.role = UserRole.highest(this.roles);
+    }
+
+    private Collection<UserRole> effectiveRoles() {
+        if (roles != null && !roles.isEmpty()) {
+            return roles;
+        }
+        return role == null ? Set.of(UserRole.MEMBER) : Set.of(role);
     }
     
     public Boolean getEnabled() {

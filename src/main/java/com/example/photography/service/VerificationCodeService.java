@@ -44,10 +44,7 @@ public class VerificationCodeService {
         entity.setAttemptCount(0);
         repository.save(entity);
 
-        String content = "<div style=\"font-family:Arial,sans-serif;color:#0f172a\">"
-                + "<h2>校融媒体管理系统</h2><p>您的验证码为：</p>"
-                + "<p style=\"font-size:28px;font-weight:700;letter-spacing:6px\">" + code + "</p>"
-                + "<p>验证码 10 分钟内有效，请勿转发给他人。</p></div>";
+        String content = EmailTemplateRenderer.renderVerificationCode(subject, code, EXPIRE_MINUTES);
         emailDeliveryService.sendHtmlMail(normalized, subject, content);
     }
 

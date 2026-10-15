@@ -24,13 +24,13 @@
                 </div>
               </div>
               <div class="field-grid two-cols">
-                <el-form-item label="系统站点标题">
+                <el-form-item label="管理系统标题">
                   <el-input v-model="settings['site.title']" maxlength="120" placeholder="例如：融媒体管理系统" />
                 </el-form-item>
-                <el-form-item label="站点副标题">
-                  <el-input v-model="settings['site.subtitle']" maxlength="120" placeholder="例如：Photography System" />
+                <el-form-item label="品牌副标题">
+                  <el-input v-model="settings['site.subtitle']" maxlength="120" placeholder="例如：Campus media center" />
                 </el-form-item>
-                <el-form-item label="公开品牌名">
+                <el-form-item label="公开品牌名（首屏主标题）">
                   <el-input v-model="settings['landing.brand.title']" maxlength="80" placeholder="例如：融媒体中心" />
                 </el-form-item>
                 <el-form-item label="首屏备用背景">
@@ -94,17 +94,20 @@
                 <el-form-item label="首屏角标">
                   <el-input v-model="settings['landing.hero.badge']" maxlength="80" placeholder="例如：校园官方新媒体平台" />
                 </el-form-item>
-                <el-form-item label="首屏标题">
+                <el-form-item label="首屏主张文案">
                   <el-input v-model="settings['landing.hero.title']" maxlength="160" placeholder="记录校园，让每一种声音被看见" />
                 </el-form-item>
-                <el-form-item label="首屏说明">
+                <el-form-item label="首屏补充说明">
                   <el-input v-model="settings['landing.hero.subtitle']" type="textarea" :rows="3" maxlength="260" show-word-limit />
                 </el-form-item>
-                <div class="field-grid two-cols">
-                  <el-form-item label="主按钮文案">
+                <div class="field-grid three-cols">
+                  <el-form-item label="投稿按钮文案">
                     <el-input v-model="settings['landing.hero.primary_cta']" maxlength="30" placeholder="视频投稿" />
                   </el-form-item>
-                  <el-form-item label="次按钮文案">
+                  <el-form-item label="加入按钮文案">
+                    <el-input v-model="settings['landing.hero.join_cta']" maxlength="30" placeholder="加入我们" />
+                  </el-form-item>
+                  <el-form-item label="栏目引导文案">
                     <el-input v-model="settings['landing.hero.secondary_cta']" maxlength="30" placeholder="了解我们" />
                   </el-form-item>
                 </div>
@@ -136,56 +139,13 @@
             </section>
           </el-form>
 
-          <aside class="landing-preview">
-            <div class="preview-heading">
-              <span>首屏实时预览</span>
-              <strong>{{ displaySetting('landing.brand.title', '融媒体中心') }}</strong>
-            </div>
-            <div class="preview-browser">
-              <div class="preview-topbar">
-                <span></span><span></span><span></span>
-              </div>
-              <div class="preview-hero">
-                <video v-if="heroPreviewIsVideo && heroPreviewMedia" :src="heroPreviewMedia" autoplay muted loop playsinline />
-                <img v-else-if="heroPreviewMedia" :src="heroPreviewMedia" alt="首屏媒体预览" />
-                <div v-else class="preview-empty">
-                  <el-icon><Picture /></el-icon>
-                </div>
-                <div class="preview-overlay"></div>
-                <div class="preview-nav-row">
-                  <span class="preview-logo">
-                    <img v-if="logoPreview" :src="logoPreview" alt="" />
-                    <el-icon v-else><Camera /></el-icon>
-                  </span>
-                  <span>{{ displaySetting('landing.nav.features_label', '校园特色') }}</span>
-                  <span>{{ displaySetting('landing.nav.showcase_label', '部门风采') }}</span>
-                </div>
-                <div class="preview-hero-copy">
-                  <small>{{ displaySetting('landing.hero.badge', '校园官方新媒体平台') }}</small>
-                  <h3>{{ displaySetting('landing.hero.title', '记录校园，让每一种声音被看见') }}</h3>
-                  <p>{{ displaySetting('landing.hero.subtitle', '校融媒体中心连接校园现场、青年创作与公共表达') }}</p>
-                  <div>
-                    <button type="button">{{ displaySetting('landing.hero.primary_cta', '视频投稿') }}</button>
-                    <button type="button" class="ghost">{{ displaySetting('landing.hero.secondary_cta', '了解我们') }}</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="preview-stat-grid">
-              <div>
-                <strong>{{ activeCampusCount }}</strong>
-                <span>校园特色</span>
-              </div>
-              <div>
-                <strong>{{ activeDepartmentCount }}</strong>
-                <span>部门风采</span>
-              </div>
-              <div>
-                <strong>{{ settings['landing.hero.media_type'] === 'video' ? '视频' : '图片' }}</strong>
-                <span>首屏媒体</span>
-              </div>
-            </div>
-          </aside>
+          <LandingLivePreview
+            v-if="tab === 'brand'"
+            :settings="settings"
+            :items="items"
+            section="hero"
+            title="首屏与导航"
+          />
         </div>
       </el-tab-pane>
 
@@ -200,7 +160,7 @@
                   <p>配置公开落地页顶部导航的可见文案。</p>
                 </div>
               </div>
-              <div class="field-grid four-cols">
+              <div class="field-grid five-cols">
                 <el-form-item label="首页">
                   <el-input v-model="settings['landing.nav.home_label']" maxlength="20" />
                 </el-form-item>
@@ -212,6 +172,9 @@
                 </el-form-item>
                 <el-form-item label="投稿入口">
                   <el-input v-model="settings['landing.nav.submission_label']" maxlength="20" />
+                </el-form-item>
+                <el-form-item label="加入入口">
+                  <el-input v-model="settings['landing.nav.join_label']" maxlength="20" />
                 </el-form-item>
               </div>
             </section>
@@ -259,34 +222,17 @@
             </section>
           </el-form>
 
-          <aside class="landing-preview copy-preview">
-            <div class="preview-heading">
-              <span>栏目预览</span>
-              <strong>公开内容结构</strong>
-            </div>
-            <div class="section-preview-block">
-              <small>{{ displaySetting('landing.features.eyebrow', '校园特色') }}</small>
-              <h3>{{ displaySetting('landing.features.title', '发现不一样的校园') }}</h3>
-              <p>{{ displaySetting('landing.features.description', '在这里，每一个角落都有故事，每一刻时光都值得被记录') }}</p>
-              <div class="mini-card-grid">
-                <div v-for="item in campusPreviewItems" :key="item.id || item.title">
-                  <span></span>
-                  <strong>{{ item.title }}</strong>
-                </div>
-              </div>
-            </div>
-            <div class="section-preview-block dark">
-              <small>{{ displaySetting('landing.showcase.eyebrow', '部门风采') }}</small>
-              <h3>{{ displaySetting('landing.showcase.title', '我们的故事') }}</h3>
-              <p>{{ displaySetting('landing.showcase.description', '一群热爱影像与创作的年轻人，用镜头讲述校园里的每一个精彩瞬间。') }}</p>
-              <div class="mini-card-grid">
-                <div v-for="item in departmentPreviewItems" :key="item.id || item.title">
-                  <span></span>
-                  <strong>{{ item.title }}</strong>
-                </div>
-              </div>
-            </div>
-          </aside>
+          <LandingLivePreview
+            v-if="tab === 'copy'"
+            :settings="settings"
+            :items="items"
+            section="features"
+            :sections="[
+              { label: '校园特色', value: 'features' },
+              { label: '部门风采', value: 'showcase' }
+            ]"
+            title="校园特色与部门风采"
+          />
         </div>
       </el-tab-pane>
 
@@ -430,31 +376,17 @@
             </section>
           </el-form>
 
-          <aside class="landing-preview submit-preview">
-            <div class="preview-heading">
-              <span>投稿与页脚预览</span>
-              <strong>{{ displaySetting('landing.submission.eyebrow', '视频投稿') }}</strong>
-            </div>
-            <div class="submit-preview-card">
-              <small>{{ displaySetting('landing.submission.eyebrow', '视频投稿') }}</small>
-              <h3>{{ displaySetting('landing.submission.title', '把你的校园故事交给我们') }}</h3>
-              <p>{{ displaySetting('landing.submission.description', '支持校园新闻、人物、活动与创意短视频投稿') }}</p>
-              <div class="preview-actions">
-                <button type="button">{{ displaySetting('landing.submission.primary_cta', '开始投稿') }}</button>
-                <button type="button">{{ displaySetting('landing.submission.secondary_cta', '部门风采') }}</button>
-              </div>
-              <div class="preview-step-row">
-                <span v-for="step in submissionStepPreview" :key="step.index">{{ step.index }} {{ step.title }}</span>
-              </div>
-            </div>
-            <div class="footer-preview-card">
-              <strong>{{ displaySetting('landing.footer.contact_title', '联系我们') }}</strong>
-              <p>{{ displaySetting('landing.contact.email', 'media@campus.edu.cn') }}</p>
-              <p>{{ displaySetting('landing.contact.phone', '010-12345678') }}</p>
-              <p>{{ displaySetting('landing.contact.address', displaySetting('landing.contact', '行政楼 203 室')) }}</p>
-              <img v-if="mediaPreview('landing.social.wechat_qr')" :src="mediaPreview('landing.social.wechat_qr')" alt="微信二维码预览" />
-            </div>
-          </aside>
+          <LandingLivePreview
+            v-if="tab === 'footer'"
+            :settings="settings"
+            :items="items"
+            section="submission"
+            :sections="[
+              { label: '投稿区域', value: 'submission' },
+              { label: '页脚', value: 'footer' }
+            ]"
+            title="投稿区域与页脚"
+          />
         </div>
       </el-tab-pane>
 
@@ -543,6 +475,7 @@ import {
 import request from '@/utils/request'
 import { getSiteImageUrl } from '@/utils/imageUrl'
 import LogoCropperDialog from '@/components/LogoCropperDialog.vue'
+import LandingLivePreview from '@/components/LandingLivePreview.vue'
 
 const settingDefaults = {
   'site.title': '融媒体管理系统',
@@ -554,10 +487,12 @@ const settingDefaults = {
   'landing.nav.features_label': '校园特色',
   'landing.nav.showcase_label': '部门风采',
   'landing.nav.submission_label': '视频投稿',
+  'landing.nav.join_label': '加入我们',
   'landing.hero.badge': '校园官方新媒体平台',
   'landing.hero.title': '记录校园，让每一种声音被看见',
   'landing.hero.subtitle': '校融媒体中心连接校园现场、青年创作与公共表达',
   'landing.hero.primary_cta': '视频投稿',
+  'landing.hero.join_cta': '加入我们',
   'landing.hero.secondary_cta': '了解我们',
   'landing.hero.media': '',
   'landing.hero.media_type': 'image',
@@ -608,23 +543,6 @@ const pendingMediaCleanup = ref(new Set())
 
 const campusItems = computed(() => items.value.filter(item => item.sectionType === 'CAMPUS_FEATURE'))
 const departmentItems = computed(() => items.value.filter(item => item.sectionType === 'DEPARTMENT_SHOWCASE'))
-const activeCampusCount = computed(() => campusItems.value.filter(item => item.published !== false).length)
-const activeDepartmentCount = computed(() => departmentItems.value.filter(item => item.published !== false).length)
-const campusPreviewItems = computed(() => campusItems.value.slice(0, 3))
-const departmentPreviewItems = computed(() => departmentItems.value.slice(0, 3))
-const logoPreview = computed(() => mediaPreview('site.logo'))
-const heroPreviewMedia = computed(() => mediaPreview('landing.hero.media') || mediaPreview('login.background'))
-const heroPreviewIsVideo = computed(() => {
-  const media = heroPreviewMedia.value
-  return settings['landing.hero.media_type'] === 'video' || /\.(mp4|mov|webm)(\?|$)/i.test(media)
-})
-const submissionStepPreview = computed(() => [
-  { index: '01', title: displaySetting('landing.submission.step_one', '上传素材') },
-  { index: '02', title: displaySetting('landing.submission.step_two', '填写信息') },
-  { index: '03', title: displaySetting('landing.submission.step_three', '等待审核') }
-])
-
-const displaySetting = (key, fallback = '') => settings[key] || fallback
 const mediaPreview = key => getSiteImageUrl(settings[key]) || ''
 const isUploading = key => uploadingKey.value === key
 const isManagedSiteMedia = value => /^\/?uploads\/site\/[^?#]+/i.test(String(value || '').trim())
@@ -1158,6 +1076,10 @@ onMounted(load)
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.field-grid.five-cols {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .media-control {
   width: 100%;
   display: grid;
@@ -1233,320 +1155,6 @@ onMounted(load)
   white-space: nowrap;
 }
 
-.landing-preview {
-  position: sticky;
-  top: 20px;
-  min-width: 0;
-  display: grid;
-  gap: 14px;
-}
-
-.preview-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  color: #173f56;
-}
-
-.preview-heading span {
-  color: #6a808b;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.preview-heading strong {
-  overflow: hidden;
-  font-size: 15px;
-  line-height: 1.3;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.preview-browser,
-.section-preview-block,
-.submit-preview-card,
-.footer-preview-card {
-  overflow: hidden;
-  background: #fff;
-  border: 1px solid rgba(188, 223, 235, 0.82);
-  border-radius: 8px;
-  box-shadow: 0 14px 34px rgba(31, 99, 132, 0.1);
-}
-
-.preview-topbar {
-  height: 34px;
-  padding: 0 12px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  background: #f1f8fb;
-  border-bottom: 1px solid rgba(188, 223, 235, 0.72);
-}
-
-.preview-topbar span {
-  width: 8px;
-  height: 8px;
-  background: #9edbe9;
-  border-radius: 999px;
-}
-
-.preview-topbar span:nth-child(2) {
-  background: #ffd58a;
-}
-
-.preview-topbar span:nth-child(3) {
-  background: #96dfb8;
-}
-
-.preview-hero {
-  position: relative;
-  min-height: 440px;
-  overflow: hidden;
-  color: #fff;
-  background: #0b3a4f;
-}
-
-.preview-hero img,
-.preview-hero video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.preview-empty {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: rgba(255, 255, 255, 0.46);
-  font-size: 42px;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
-    #0b3a4f;
-  background-size: 28px 28px;
-}
-
-.preview-overlay {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(4, 24, 34, 0.22), rgba(4, 24, 34, 0.72)),
-    rgba(0, 0, 0, 0.2);
-}
-
-.preview-nav-row {
-  position: relative;
-  z-index: 1;
-  margin: 18px;
-  padding: 10px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 12px;
-  font-weight: 800;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.preview-logo {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  color: #0f8fc3;
-  background: #fff;
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.preview-logo img {
-  position: static;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 999px;
-}
-
-.preview-hero-copy {
-  position: absolute;
-  z-index: 1;
-  left: 26px;
-  right: 26px;
-  bottom: 34px;
-}
-
-.preview-hero-copy small,
-.section-preview-block small,
-.submit-preview-card small {
-  display: inline-flex;
-  margin-bottom: 12px;
-  padding: 7px 12px;
-  color: #dffaff;
-  font-size: 12px;
-  font-weight: 900;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-}
-
-.preview-hero-copy h3,
-.section-preview-block h3,
-.submit-preview-card h3 {
-  margin: 0 0 10px;
-  font-size: 28px;
-  line-height: 1.18;
-  font-weight: 900;
-  letter-spacing: 0;
-}
-
-.preview-hero-copy p,
-.section-preview-block p,
-.submit-preview-card p,
-.footer-preview-card p {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.82);
-  font-size: 14px;
-  line-height: 1.7;
-}
-
-.preview-hero-copy div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.preview-hero-copy button,
-.preview-actions button {
-  min-height: 36px;
-  padding: 0 16px;
-  color: #073748;
-  font-weight: 900;
-  background: #fff;
-  border: 0;
-  border-radius: 999px;
-}
-
-.preview-hero-copy button.ghost,
-.preview-actions button + button {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.24);
-}
-
-.preview-stat-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.preview-stat-grid div {
-  padding: 14px;
-  display: grid;
-  gap: 4px;
-  background: #fff;
-  border: 1px solid rgba(188, 223, 235, 0.82);
-  border-radius: 8px;
-}
-
-.preview-stat-grid strong {
-  color: #0f8fc3;
-  font-size: 18px;
-  line-height: 1.2;
-  font-weight: 900;
-}
-
-.preview-stat-grid span {
-  color: #6a808b;
-  font-size: 12px;
-}
-
-.section-preview-block {
-  padding: 24px;
-}
-
-.section-preview-block small {
-  color: #0f8fc3;
-  background: #e8f8fb;
-  border-color: rgba(32, 184, 210, 0.2);
-}
-
-.section-preview-block h3 {
-  color: #173f56;
-}
-
-.section-preview-block p {
-  color: #5f788f;
-}
-
-.section-preview-block.dark {
-  color: #fff;
-  background: #0b3a4f;
-  border-color: rgba(11, 58, 79, 0.4);
-}
-
-.section-preview-block.dark small {
-  color: #dffaff;
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.16);
-}
-
-.section-preview-block.dark h3 {
-  color: #fff;
-}
-
-.mini-card-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.mini-card-grid div {
-  min-width: 0;
-  padding: 10px;
-  background: rgba(235, 248, 252, 0.86);
-  border-radius: 8px;
-}
-
-.dark .mini-card-grid div {
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.mini-card-grid span {
-  display: block;
-  aspect-ratio: 4 / 3;
-  margin-bottom: 8px;
-  background: linear-gradient(135deg, #d9f7fc, #fff7ed);
-  border-radius: 6px;
-}
-
-.dark .mini-card-grid span {
-  background: linear-gradient(135deg, rgba(39, 196, 215, 0.42), rgba(255, 213, 138, 0.36));
-}
-
-.mini-card-grid strong {
-  display: block;
-  overflow: hidden;
-  color: #173f56;
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dark .mini-card-grid strong {
-  color: #fff;
-}
-
 .sub-config-title {
   margin: 18px 0 12px;
   color: #173f56;
@@ -1574,82 +1182,6 @@ onMounted(load)
   color: #0f8fc3;
   font-size: 12px;
   font-weight: 900;
-}
-
-.submit-preview-card {
-  padding: 26px;
-  color: #173f56;
-  background: linear-gradient(135deg, #fff, #eefdff);
-}
-
-.submit-preview-card small {
-  color: #c75a0e;
-  background: #fff7ed;
-  border-color: rgba(249, 115, 22, 0.18);
-}
-
-.submit-preview-card p {
-  color: #5f788f;
-}
-
-.preview-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.preview-actions button {
-  color: #fff;
-  background: #f97316;
-}
-
-.preview-actions button + button {
-  color: #0f6f84;
-  background: #e8f8fb;
-  border-color: rgba(32, 184, 210, 0.22);
-}
-
-.preview-step-row {
-  display: grid;
-  gap: 8px;
-  margin-top: 18px;
-}
-
-.preview-step-row span {
-  padding: 10px 12px;
-  color: #173f56;
-  font-size: 13px;
-  font-weight: 800;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(202, 222, 230, 0.72);
-  border-radius: 8px;
-}
-
-.footer-preview-card {
-  padding: 22px;
-  color: #fff;
-  background: #092d3d;
-}
-
-.footer-preview-card strong {
-  display: block;
-  margin-bottom: 12px;
-  font-size: 16px;
-}
-
-.footer-preview-card p {
-  color: rgba(220, 233, 238, 0.84);
-}
-
-.footer-preview-card img {
-  width: 82px;
-  height: 82px;
-  margin-top: 14px;
-  object-fit: cover;
-  background: #fff;
-  border: 4px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
 }
 
 .content-toolbar {
@@ -1804,11 +1336,8 @@ onMounted(load)
     grid-template-columns: 1fr;
   }
 
-  .landing-preview {
-    position: static;
-  }
-
-  .field-grid.four-cols {
+  .field-grid.four-cols,
+  .field-grid.five-cols {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -1827,8 +1356,8 @@ onMounted(load)
   .field-grid.two-cols,
   .field-grid.three-cols,
   .field-grid.four-cols,
+  .field-grid.five-cols,
   .topic-config-grid,
-  .mini-card-grid,
   :global(.dialog-field-grid) {
     grid-template-columns: 1fr;
   }
@@ -1847,18 +1376,6 @@ onMounted(load)
   .media-preview,
   .media-preview.compact,
   .media-preview.qr {
-    grid-template-columns: 1fr;
-  }
-
-  .preview-hero {
-    min-height: 360px;
-  }
-
-  .preview-hero-copy h3 {
-    font-size: 23px;
-  }
-
-  .preview-stat-grid {
     grid-template-columns: 1fr;
   }
 

@@ -19,6 +19,7 @@ public class JoinApplicationResponse {
     private String college;
     private String major;
     private Integer enrollmentYear;
+    private String className;
     private String selfIntroduction;
     private String workOriginalFilename;
     private String workMimeType;
@@ -48,6 +49,7 @@ public class JoinApplicationResponse {
         response.setCollege(entity.getCollege());
         response.setMajor(entity.getMajor());
         response.setEnrollmentYear(entity.getEnrollmentYear());
+        response.setClassName(entity.getClassName());
         response.setSelfIntroduction(entity.getSelfIntroduction());
         response.setWorkOriginalFilename(entity.getWorkOriginalFilename());
         response.setWorkMimeType(entity.getWorkMimeType());

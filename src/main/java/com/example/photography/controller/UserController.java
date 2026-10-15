@@ -52,20 +52,7 @@ public class UserController {
             
             // 转换为UserResponse DTO
             List<UserResponse> userResponses = users.stream()
-                .map(user -> new UserResponse(
-                    user.getId(),
-                    user.getUsername(),
-                    user.getRealName(),
-                    user.getEmail(),
-                    user.getPhone(),
-                    user.getAvatarUrl(),
-                    user.getRole(),
-                    user.getEnabled(),
-                    user.getDepartment() != null ? user.getDepartment().getName() : null,
-                    user.getDepartment() != null ? user.getDepartment().getId() : null,
-                    user.getCreatedAt(),
-                    user.getUpdatedAt()
-                ))
+                .map(UserResponse::from)
                 .collect(Collectors.toList());
             
             return ApiResponse.success(userResponses);
@@ -109,22 +96,11 @@ public class UserController {
             }
             
             // 转换为UserResponse DTO
-            Page<UserResponse> userResponses = users.map(user -> new UserResponse(
-                user.getId(),
-                user.getUsername(),
-                user.getRealName(),
-                user.getEmail(),
-                user.getPhone(),
-                user.getAvatarUrl(),
-                user.getRole(),
-                user.getEnabled(),
-                user.getDepartment() != null ? user.getDepartment().getName() : null,
-                user.getDepartment() != null ? user.getDepartment().getId() : null,
-                user.getCreatedAt(),
-                user.getUpdatedAt()
-            ));
+            Page<UserResponse> userResponses = users.map(UserResponse::from);
             
             return ApiResponse.success(userResponses);
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
             return ApiResponse.error(e.getMessage());
         }
@@ -142,20 +118,7 @@ public class UserController {
             Page<User> users = userService.searchUsersWithDepartment(keyword, pageable);
             
             // 转换为UserResponse DTO
-            Page<UserResponse> userResponses = users.map(user -> new UserResponse(
-                user.getId(),
-                user.getUsername(),
-                user.getRealName(),
-                user.getEmail(),
-                user.getPhone(),
-                user.getAvatarUrl(),
-                user.getRole(),
-                user.getEnabled(),
-                user.getDepartment() != null ? user.getDepartment().getName() : null,
-                user.getDepartment() != null ? user.getDepartment().getId() : null,
-                user.getCreatedAt(),
-                user.getUpdatedAt()
-            ));
+            Page<UserResponse> userResponses = users.map(UserResponse::from);
             
             return ApiResponse.success(userResponses);
         } catch (Exception e) {
@@ -168,20 +131,7 @@ public class UserController {
     public ApiResponse<UserResponse> getUserById(@PathVariable Long id) {
         try {
             User user = userService.findByIdWithDepartment(id);
-            UserResponse userResponse = new UserResponse(
-                user.getId(),
-                user.getUsername(),
-                user.getRealName(),
-                user.getEmail(),
-                user.getPhone(),
-                user.getAvatarUrl(),
-                user.getRole(),
-                user.getEnabled(),
-                user.getDepartment() != null ? user.getDepartment().getName() : null,
-                user.getDepartment() != null ? user.getDepartment().getId() : null,
-                user.getCreatedAt(),
-                user.getUpdatedAt()
-            );
+            UserResponse userResponse = UserResponse.from(user);
             return ApiResponse.success(userResponse);
         } catch (Exception e) {
             return ApiResponse.error(e.getMessage());
@@ -195,20 +145,7 @@ public class UserController {
         try {
             List<User> users = userService.findByRoleWithDepartment(role);
             List<UserResponse> userResponses = users.stream()
-                .map(user -> new UserResponse(
-                    user.getId(),
-                    user.getUsername(),
-                    user.getRealName(),
-                    user.getEmail(),
-                    user.getPhone(),
-                    user.getAvatarUrl(),
-                    user.getRole(),
-                    user.getEnabled(),
-                    user.getDepartment() != null ? user.getDepartment().getName() : null,
-                    user.getDepartment() != null ? user.getDepartment().getId() : null,
-                    user.getCreatedAt(),
-                    user.getUpdatedAt()
-                ))
+                .map(UserResponse::from)
                 .collect(Collectors.toList());
             return ApiResponse.success(userResponses);
         } catch (Exception e) {
@@ -222,20 +159,7 @@ public class UserController {
         try {
             List<User> users = userService.findByDepartmentWithDetails(departmentId);
             List<UserResponse> userResponses = users.stream()
-                .map(user -> new UserResponse(
-                    user.getId(),
-                    user.getUsername(),
-                    user.getRealName(),
-                    user.getEmail(),
-                    user.getPhone(),
-                    user.getAvatarUrl(),
-                    user.getRole(),
-                    user.getEnabled(),
-                    user.getDepartment() != null ? user.getDepartment().getName() : null,
-                    user.getDepartment() != null ? user.getDepartment().getId() : null,
-                    user.getCreatedAt(),
-                    user.getUpdatedAt()
-                ))
+                .map(UserResponse::from)
                 .collect(Collectors.toList());
             return ApiResponse.success(userResponses);
         } catch (Exception e) {
@@ -249,29 +173,17 @@ public class UserController {
     public ApiResponse<UserResponse> createUser(@Valid @RequestBody UserCreateRequest request) {
         try {
             User currentUser = userService.findByUsername(SecurityContextHolder.getContext().getAuthentication().getName());
-            if (currentUser.getRole() != UserRole.SUPER_ADMIN && currentUser.getRole() != UserRole.ADMIN) {
+            if (!currentUser.isSuperAdmin()) {
                 request.setRole(UserRole.MEMBER);
-            } else if (request.getRole() == UserRole.ADMIN) {
-                request.setRole(UserRole.SUPER_ADMIN);
+                request.setRoles(java.util.Set.of(UserRole.MEMBER));
             }
             User user = userService.createUser(request);
             // 重新加载用户以获取部门信息
             User userWithDepartment = userService.findByIdWithDepartment(user.getId());
-            UserResponse userResponse = new UserResponse(
-                userWithDepartment.getId(),
-                userWithDepartment.getUsername(),
-                userWithDepartment.getRealName(),
-                userWithDepartment.getEmail(),
-                userWithDepartment.getPhone(),
-                userWithDepartment.getAvatarUrl(),
-                userWithDepartment.getRole(),
-                userWithDepartment.getEnabled(),
-                userWithDepartment.getDepartment() != null ? userWithDepartment.getDepartment().getName() : null,
-                userWithDepartment.getDepartment() != null ? userWithDepartment.getDepartment().getId() : null,
-                userWithDepartment.getCreatedAt(),
-                userWithDepartment.getUpdatedAt()
-            );
+            UserResponse userResponse = UserResponse.from(userWithDepartment);
             return ApiResponse.success("用户创建成功", userResponse);
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
             return ApiResponse.error(e.getMessage());
         }
@@ -288,7 +200,7 @@ public class UserController {
             User currentUser = userService.findByUsername(currentUsername);
             
             // 权限检查：必须是管理员或者修改自己的信息
-            boolean isSuperAdmin = currentUser.getRole() == UserRole.SUPER_ADMIN || currentUser.getRole() == UserRole.ADMIN;
+            boolean isSuperAdmin = currentUser.isSuperAdmin();
             boolean isAdmin = isSuperAdmin || currentUser.getRole() == UserRole.DIRECTOR;
             boolean isOwner = currentUser.getId().equals(id);
             
@@ -298,6 +210,7 @@ public class UserController {
 
             // 身份提升只能通过超级管理员接口执行，普通用户也不能借此接口修改自己的权限和状态。
             request.setRole(null);
+            request.setRoles(null);
             if (!isAdmin) {
                 request.setDepartmentId(null);
                 request.setEnabled(null);
@@ -305,20 +218,7 @@ public class UserController {
             }
             
             User user = userService.updateUserPartial(id, request);
-            UserResponse userResponse = new UserResponse(
-                user.getId(),
-                user.getUsername(),
-                user.getRealName(),
-                user.getEmail(),
-                user.getPhone(),
-                user.getAvatarUrl(),
-                user.getRole(),
-                user.getEnabled(),
-                user.getDepartment() != null ? user.getDepartment().getName() : null,
-                user.getDepartment() != null ? user.getDepartment().getId() : null,
-                user.getCreatedAt(),
-                user.getUpdatedAt()
-            );
+            UserResponse userResponse = UserResponse.from(user);
             return ApiResponse.success("用户信息更新成功", userResponse);
         } catch (Exception e) {
             return ApiResponse.error(e.getMessage());
@@ -476,20 +376,7 @@ public class UserController {
             String username = authentication.getName();
             User user = userService.findByUsernameWithDepartment(username);
             
-            UserResponse userResponse = new UserResponse(
-                user.getId(),
-                user.getUsername(),
-                user.getRealName(),
-                user.getEmail(),
-                user.getPhone(),
-                user.getAvatarUrl(),
-                user.getRole(),
-                user.getEnabled(),
-                user.getDepartment() != null ? user.getDepartment().getName() : null,
-                user.getDepartment() != null ? user.getDepartment().getId() : null,
-                user.getCreatedAt(),
-                user.getUpdatedAt()
-            );
+            UserResponse userResponse = UserResponse.from(user);
             
             return ApiResponse.success(userResponse);
         } catch (Exception e) {
@@ -541,20 +428,7 @@ public class UserController {
             // 重新获取完整用户信息（包含部门信息）
             User userWithDepartment = userService.findByUsernameWithDepartment(username);
             
-            UserResponse userResponse = new UserResponse(
-                userWithDepartment.getId(),
-                userWithDepartment.getUsername(),
-                userWithDepartment.getRealName(),
-                userWithDepartment.getEmail(),
-                userWithDepartment.getPhone(),
-                userWithDepartment.getAvatarUrl(),
-                userWithDepartment.getRole(),
-                userWithDepartment.getEnabled(),
-                userWithDepartment.getDepartment() != null ? userWithDepartment.getDepartment().getName() : null,
-                userWithDepartment.getDepartment() != null ? userWithDepartment.getDepartment().getId() : null,
-                userWithDepartment.getCreatedAt(),
-                userWithDepartment.getUpdatedAt()
-            );
+            UserResponse userResponse = UserResponse.from(userWithDepartment);
             
             return ApiResponse.success("个人信息更新成功", userResponse);
         } catch (Exception e) {
@@ -592,20 +466,7 @@ public class UserController {
             }
             
             List<UserResponse> userResponses = users.stream()
-                .map(user -> new UserResponse(
-                    user.getId(),
-                    user.getUsername(),
-                    user.getRealName(),
-                    user.getEmail(),
-                    user.getPhone(),
-                    user.getAvatarUrl(),
-                    user.getRole(),
-                    user.getEnabled(),
-                    user.getDepartment() != null ? user.getDepartment().getName() : null,
-                    user.getDepartment() != null ? user.getDepartment().getId() : null,
-                    user.getCreatedAt(),
-                    user.getUpdatedAt()
-                ))
+                .map(UserResponse::from)
                 .collect(Collectors.toList());
             
             return ApiResponse.success(userResponses);
@@ -623,20 +484,7 @@ public class UserController {
         try {
             List<User> users = userService.getAllActiveUsers();
             List<UserResponse> userResponses = users.stream()
-                .map(user -> new UserResponse(
-                    user.getId(),
-                    user.getUsername(),
-                    user.getRealName(),
-                    user.getEmail(),
-                    user.getPhone(),
-                    user.getAvatarUrl(),
-                    user.getRole(),
-                    user.getEnabled(),
-                    user.getDepartment() != null ? user.getDepartment().getName() : null,
-                    user.getDepartment() != null ? user.getDepartment().getId() : null,
-                    user.getCreatedAt(),
-                    user.getUpdatedAt()
-                ))
+                .map(UserResponse::from)
                 .collect(Collectors.toList());
             return ApiResponse.success(userResponses);
         } catch (Exception e) {

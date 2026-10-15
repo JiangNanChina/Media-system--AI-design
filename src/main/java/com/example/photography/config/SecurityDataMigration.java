@@ -2,7 +2,6 @@ package com.example.photography.config;
 
 import com.example.photography.model.entity.User;
 import com.example.photography.model.enums.AccountStatus;
-import com.example.photography.model.enums.UserRole;
 import com.example.photography.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,17 +27,14 @@ public class SecurityDataMigration implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         List<User> users = userRepository.findAll();
         int passwordCount = 0;
-        int roleCount = 0;
         for (User user : users) {
             if (user.getAccountStatus() == null) {
                 user.setAccountStatus(Boolean.TRUE.equals(user.getEnabled()) ? AccountStatus.ACTIVE : AccountStatus.DISABLED);
             }
             if (user.getTokenVersion() == null) user.setTokenVersion(0);
             if (user.getFailedLoginAttempts() == null) user.setFailedLoginAttempts(0);
-            if (user.getRole() == UserRole.ADMIN) {
-                user.setRole(UserRole.SUPER_ADMIN);
-                roleCount++;
-            }
+            // Backfill an empty collection from the compatibility column and normalize legacy ADMIN.
+            user.setRoles(user.getRoles());
             String password = user.getPassword();
             if (password != null && !password.startsWith("$2")) {
                 user.setPassword(passwordEncoder.encode(password));
@@ -46,8 +42,8 @@ public class SecurityDataMigration implements ApplicationRunner {
             }
         }
         userRepository.saveAll(users);
-        if (passwordCount > 0 || roleCount > 0) {
-            log.info("用户安全迁移完成: 密码升级={}, 角色升级={}", passwordCount, roleCount);
+        if (passwordCount > 0) {
+            log.info("用户安全迁移完成: 密码升级={}", passwordCount);
         }
     }
 }

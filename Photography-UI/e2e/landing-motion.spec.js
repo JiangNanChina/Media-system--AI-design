@@ -1,5 +1,29 @@
 import { expect, test } from '@playwright/test'
 
+for (const viewport of [
+  { width: 2048, height: 1024 },
+  { width: 1440, height: 900 },
+  { width: 375, height: 812 }
+]) {
+  test(`landing hero fills the ${viewport.width}x${viewport.height} viewport`, async ({ page }) => {
+    await page.setViewportSize(viewport)
+    await page.goto('/', { waitUntil: 'networkidle' })
+
+    const layout = await page.locator('.landing-page').evaluate(() => {
+      const hero = document.querySelector('.hero')
+      const features = document.querySelector('#features')
+      return {
+        viewportHeight: window.innerHeight,
+        heroHeight: hero.getBoundingClientRect().height,
+        featuresTop: features.getBoundingClientRect().top
+      }
+    })
+
+    expect(layout.heroHeight).toBeGreaterThanOrEqual(layout.viewportHeight - 1)
+    expect(layout.featuresTop).toBeGreaterThanOrEqual(layout.viewportHeight - 1)
+  })
+}
+
 test('landing interactions respond to pointer and reading progress', async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' })
   await page.setViewportSize({ width: 1440, height: 900 })

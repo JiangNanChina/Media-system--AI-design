@@ -5,13 +5,17 @@
 
 const DEVICE_ID_STORAGE_KEY = 'photography_device_id'
 const DEVICE_ID_COOKIE_NAME = 'photography_device_id'
+const DEVICE_ID_DB_NAME = 'photography_device_identity'
+const DEVICE_ID_STORE_NAME = 'identity'
+const DEVICE_ID_RECORD_KEY = 'stable_device_id'
+let stableDeviceIdPromise = null
 
 /**
  * 生成设备指纹
  * @returns {Promise<Object>} 设备信息对象
  */
 export async function generateDeviceFingerprint() {
-  const stableDeviceId = getOrCreateStableDeviceId()
+  const stableDeviceId = await getOrCreateStableDeviceId()
   const fingerprint = {
     // 基础信息仅用于展示和兼容判断，不再直接作为主指纹
     userAgent: navigator.userAgent,
@@ -60,10 +64,12 @@ export async function generateDeviceFingerprint() {
   // 波动项仍保留在 rawFingerprint 中用于排查，主指纹优先使用持久化 ID。
   const fingerprintString = JSON.stringify(stableFallbackFingerprint, Object.keys(stableFallbackFingerprint).sort())
   const fingerprintHash = await generateHash(fingerprintString)
+  const hardwareFingerprint = await generateHardwareFingerprint(fingerprint)
   
   return {
     deviceFingerprint: stableDeviceId || `fallback_${fingerprintHash}`,
     stableDeviceId,
+    hardwareFingerprint,
     deviceName: getDeviceName(),
     deviceType: getDeviceType(),
     osInfo: getOSInfo(),
@@ -82,24 +88,35 @@ export async function generateDeviceFingerprint() {
 /**
  * 获取或创建设备稳定ID。只要用户未清理浏览器数据，同一浏览器会保持不变。
  */
-function getOrCreateStableDeviceId() {
-  const storedId = readStoredDeviceId()
+async function getOrCreateStableDeviceId() {
+  if (stableDeviceIdPromise) {
+    return stableDeviceIdPromise
+  }
+  stableDeviceIdPromise = (async () => {
+  const storedId = await readStoredDeviceId()
   if (storedId) {
+    // 自动补齐缺失的存储副本，提高浏览器升级或单个存储失效后的稳定性。
+    await writeStoredDeviceId(storedId)
     return storedId
   }
 
   const newId = createDeviceId()
-  if (writeStoredDeviceId(newId)) {
+  if (await writeStoredDeviceId(newId)) {
     return newId
   }
 
   return null
+  })()
+  stableDeviceIdPromise.catch(() => {
+    stableDeviceIdPromise = null
+  })
+  return stableDeviceIdPromise
 }
 
-function readStoredDeviceId() {
+async function readStoredDeviceId() {
   try {
     const value = window.localStorage?.getItem(DEVICE_ID_STORAGE_KEY)
-    if (value) {
+    if (isValidStableDeviceId(value)) {
       return value
     }
   } catch (e) {
@@ -111,21 +128,30 @@ function readStoredDeviceId() {
       ?.split('; ')
       .find(row => row.startsWith(`${DEVICE_ID_COOKIE_NAME}=`))
     if (match) {
-      return decodeURIComponent(match.split('=').slice(1).join('='))
+      const cookieValue = decodeURIComponent(match.split('=').slice(1).join('='))
+      if (isValidStableDeviceId(cookieValue)) {
+        return cookieValue
+      }
     }
   } catch (e) {
     // Ignore cookie errors
   }
 
-  return null
+  const indexedDbValue = await readDeviceIdFromIndexedDb()
+  return isValidStableDeviceId(indexedDbValue) ? indexedDbValue : null
 }
 
-function writeStoredDeviceId(deviceId) {
-  let stored = false
+async function writeStoredDeviceId(deviceId) {
+  if (!isValidStableDeviceId(deviceId)) {
+    return false
+  }
+
+  let localStorageStored = false
+  let cookieStored = false
 
   try {
     window.localStorage?.setItem(DEVICE_ID_STORAGE_KEY, deviceId)
-    stored = true
+    localStorageStored = window.localStorage?.getItem(DEVICE_ID_STORAGE_KEY) === deviceId
   } catch (e) {
     // Ignore storage errors
   }
@@ -133,12 +159,80 @@ function writeStoredDeviceId(deviceId) {
   try {
     const maxAge = 60 * 60 * 24 * 365 * 3
     document.cookie = `${DEVICE_ID_COOKIE_NAME}=${encodeURIComponent(deviceId)}; Max-Age=${maxAge}; Path=/; SameSite=Lax`
-    stored = true
+    cookieStored = document.cookie
+      .split('; ')
+      .some(row => row === `${DEVICE_ID_COOKIE_NAME}=${encodeURIComponent(deviceId)}`)
   } catch (e) {
     // Ignore cookie errors
   }
 
-  return stored
+  const indexedDbStored = await writeDeviceIdToIndexedDb(deviceId)
+  return localStorageStored || cookieStored || indexedDbStored
+}
+
+function isValidStableDeviceId(deviceId) {
+  return typeof deviceId === 'string'
+    && /^browser_[a-zA-Z0-9-]{16,100}$/.test(deviceId)
+}
+
+function openDeviceIdentityDb() {
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) {
+      resolve(null)
+      return
+    }
+
+    const request = window.indexedDB.open(DEVICE_ID_DB_NAME, 1)
+    request.onupgradeneeded = () => {
+      const db = request.result
+      if (!db.objectStoreNames.contains(DEVICE_ID_STORE_NAME)) {
+        db.createObjectStore(DEVICE_ID_STORE_NAME)
+      }
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+    request.onblocked = () => reject(new Error('IndexedDB is blocked'))
+  })
+}
+
+async function readDeviceIdFromIndexedDb() {
+  let db
+  try {
+    db = await openDeviceIdentityDb()
+    if (!db) return null
+    return await new Promise((resolve, reject) => {
+      const request = db
+        .transaction(DEVICE_ID_STORE_NAME, 'readonly')
+        .objectStore(DEVICE_ID_STORE_NAME)
+        .get(DEVICE_ID_RECORD_KEY)
+      request.onsuccess = () => resolve(request.result || null)
+      request.onerror = () => reject(request.error)
+    })
+  } catch (e) {
+    return null
+  } finally {
+    db?.close()
+  }
+}
+
+async function writeDeviceIdToIndexedDb(deviceId) {
+  let db
+  try {
+    db = await openDeviceIdentityDb()
+    if (!db) return false
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(DEVICE_ID_STORE_NAME, 'readwrite')
+      transaction.objectStore(DEVICE_ID_STORE_NAME).put(deviceId, DEVICE_ID_RECORD_KEY)
+      transaction.oncomplete = () => resolve()
+      transaction.onerror = () => reject(transaction.error)
+      transaction.onabort = () => reject(transaction.error)
+    })
+    return true
+  } catch (e) {
+    return false
+  } finally {
+    db?.close()
+  }
 }
 
 function createDeviceId() {
@@ -155,6 +249,101 @@ function createDeviceId() {
   }
 
   return `browser_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
+}
+
+/**
+ * 生成用于同设备恢复的硬件特征。排除浏览器名称/版本、UA 全文和屏幕方向等易变项。
+ * 该摘要只由后端在同一账号、同一设备槽位内做唯一匹配。
+ */
+async function generateHardwareFingerprint(fingerprint) {
+  const clientHints = await getStableClientHints()
+  const hardwareProfile = {
+    version: 1,
+    deviceType: getDeviceType(),
+    osFamily: getOSFamily(),
+    platform: normalizePlatform(clientHints.platform || navigator.platform),
+    model: clientHints.model,
+    architecture: clientHints.architecture,
+    bitness: clientHints.bitness,
+    screenResolution: normalizeScreenResolution(fingerprint.screenResolution),
+    screenColorDepth: fingerprint.screenColorDepth || 0,
+    hardwareConcurrency: fingerprint.hardwareConcurrency || 0,
+    deviceMemory: fingerprint.deviceMemory || 0,
+    maxTouchPoints: fingerprint.touchSupport?.maxTouchPoints || 0,
+    touchEvent: Boolean(fingerprint.touchSupport?.touchEvent),
+    webglVendor: normalizeFingerprintValue(fingerprint.webglVendor),
+    webglRenderer: normalizeFingerprintValue(fingerprint.webglRenderer)
+  }
+  const serialized = JSON.stringify(hardwareProfile, Object.keys(hardwareProfile).sort())
+  return 'hardware_v1_' + await generateHash64(serialized)
+}
+
+async function getStableClientHints() {
+  const userAgentData = navigator.userAgentData
+  if (!userAgentData?.getHighEntropyValues) {
+    return {
+      platform: userAgentData?.platform || '',
+      model: '',
+      architecture: '',
+      bitness: ''
+    }
+  }
+
+  try {
+    const values = await userAgentData.getHighEntropyValues([
+      'platform',
+      'model',
+      'architecture',
+      'bitness'
+    ])
+    return {
+      platform: normalizeFingerprintValue(values.platform),
+      model: normalizeFingerprintValue(values.model),
+      architecture: normalizeFingerprintValue(values.architecture),
+      bitness: normalizeFingerprintValue(values.bitness)
+    }
+  } catch (e) {
+    return {
+      platform: normalizeFingerprintValue(userAgentData.platform),
+      model: '',
+      architecture: '',
+      bitness: ''
+    }
+  }
+}
+
+async function generateHash64(value) {
+  try {
+    const webCrypto = window.crypto || window.msCrypto
+    if (webCrypto?.subtle) {
+      const encoder = new TextEncoder()
+      const data = encoder.encode(value)
+      const hashBuffer = await webCrypto.subtle.digest('SHA-256', data)
+      return Array.from(new Uint8Array(hashBuffer))
+        .map(byte => byte.toString(16).padStart(2, '0'))
+        .join('')
+    }
+  } catch (e) {
+    // Continue with the deterministic fixed-length fallback below.
+  }
+
+  // 八个不同种子的 32 位 FNV-1a 片段组成 64 位十六进制摘要。
+  return Array.from({ length: 8 }, (_, seed) => {
+    let hash = (0x811c9dc5 ^ seed) >>> 0
+    for (let index = 0; index < value.length; index += 1) {
+      hash ^= value.charCodeAt(index)
+      hash = Math.imul(hash, 0x01000193) >>> 0
+    }
+    return hash.toString(16).padStart(8, '0')
+  }).join('')
+}
+
+function normalizePlatform(platform) {
+  return String(platform || 'unknown').trim().toLowerCase()
+}
+
+function normalizeFingerprintValue(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase()
 }
 
 /**

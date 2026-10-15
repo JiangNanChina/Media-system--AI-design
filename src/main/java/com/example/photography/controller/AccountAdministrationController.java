@@ -17,7 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/accounts/admin")
@@ -57,9 +59,12 @@ public class AccountAdministrationController {
     @PutMapping("/{id}/role")
     @Transactional
     public ApiResponse<Void> role(@PathVariable Long id, @Valid @RequestBody RoleAssignmentRequest request) {
-        if (request.getRole() == UserRole.ADMIN) throw new IllegalArgumentException("请使用SUPER_ADMIN身份");
+        Set<UserRole> requestedRoles = request.requestedRoles();
+        if (requestedRoles.isEmpty()) throw new IllegalArgumentException("请至少选择一个角色");
+        if (requestedRoles.stream().anyMatch(java.util.Objects::isNull)) throw new IllegalArgumentException("角色不能为空");
+        if (requestedRoles.contains(UserRole.ADMIN)) throw new IllegalArgumentException("请使用SUPER_ADMIN身份");
         User user = userRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("用户不存在"));
-        user.setRole(request.getRole());
+        user.setRoles(requestedRoles);
         user.setTokenVersion((user.getTokenVersion() == null ? 0 : user.getTokenVersion()) + 1);
         userRepository.save(user);
         refreshTokenService.revokeAll(id);
@@ -73,6 +78,7 @@ public class AccountAdministrationController {
         result.put("realName", user.getRealName());
         result.put("email", user.getEmail());
         result.put("role", user.getRole());
+        result.put("roles", user.getRoles());
         result.put("accountStatus", user.getAccountStatus());
         return result;
     }
@@ -85,6 +91,13 @@ public class AccountAdministrationController {
 
     @Data
     public static class RoleAssignmentRequest {
-        @NotNull private UserRole role;
+        private UserRole role;
+        private Set<UserRole> roles;
+
+        private Set<UserRole> requestedRoles() {
+            if (roles != null) return new LinkedHashSet<>(roles);
+            if (role != null) return new LinkedHashSet<>(Set.of(role));
+            return new LinkedHashSet<>();
+        }
     }
 }

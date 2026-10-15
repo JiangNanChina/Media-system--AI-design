@@ -41,10 +41,11 @@ public class JoinApplicationController {
             @RequestParam String college,
             @RequestParam String major,
             @RequestParam Integer enrollmentYear,
+            @RequestParam String className,
             @RequestParam String selfIntroduction,
             @RequestPart(value = "work", required = false) MultipartFile work) {
         JoinApplicationResponse response = joinApplicationService.submit(
-                realName, qqEmail, phone, gender, college, major, enrollmentYear, selfIntroduction, work);
+                realName, qqEmail, phone, gender, college, major, enrollmentYear, className, selfIntroduction, work);
         return ApiResponse.success("申请已提交", response);
     }
 
@@ -90,6 +91,14 @@ public class JoinApplicationController {
                 .contentType(MediaType.parseMediaType(entity.getWorkMimeType()))
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(resource);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or authentication.authorities.?[authority == 'ROLE_ADMIN'].size() > 0")
+    @Operation(summary = "永久删除入部申请", description = "超级管理员物理删除申请记录及其服务器作品文件")
+    public ApiResponse<Void> deletePermanently(@PathVariable Long id) {
+        joinApplicationService.deletePermanently(id);
+        return ApiResponse.success("入部申请及服务器作品文件已永久删除");
     }
 
     @GetMapping("/admin/interview-group")

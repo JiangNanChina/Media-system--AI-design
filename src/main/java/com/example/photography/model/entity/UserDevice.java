@@ -28,6 +28,12 @@ public class UserDevice extends BaseEntity {
      */
     @Column(name = "device_fingerprint", nullable = false, length = 500)
     private String deviceFingerprint;
+
+    /**
+     * 设备硬件特征摘要。用于浏览器本地设备 ID 丢失后的受控恢复。
+     */
+    @Column(name = "hardware_fingerprint", length = 128)
+    private String hardwareFingerprint;
     
     /**
      * 设备名称/型号

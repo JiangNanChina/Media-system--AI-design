@@ -42,6 +42,9 @@ public class JoinApplication extends BaseEntity {
     @Column(name = "enrollment_year", nullable = false)
     private Integer enrollmentYear;
 
+    @Column(name = "class_name", nullable = false, length = 80)
+    private String className;
+
     @Column(name = "self_introduction", nullable = false, columnDefinition = "TEXT")
     private String selfIntroduction;
 

@@ -32,7 +32,7 @@ const props = defineProps({
   status: {
     type: String,
     default: 'uploading',
-    validator: value => ['uploading', 'processing', 'error'].includes(value)
+    validator: value => ['packing', 'uploading', 'processing', 'error'].includes(value)
   },
   subject: {
     type: String,
@@ -45,12 +45,14 @@ const props = defineProps({
 })
 
 const statusTitle = computed(() => {
+  if (props.status === 'packing') return `${props.subject}正在打包`
   if (props.status === 'error') return `${props.subject}上传中断`
   if (props.status === 'processing') return `${props.subject}上传完成`
   return `${props.subject}上传中`
 })
 
 const statusDetail = computed(() => {
+  if (props.status === 'packing') return '正在整理所选文件并保留文件夹结构，请保持页面开启。'
   if (props.status === 'error') return '网络连接中断，文件仍已保留，可重新提交。'
   if (props.status === 'processing') return '文件已传输完成，正在等待服务器确认。'
   return '请保持页面开启，上传期间请勿更换文件。'

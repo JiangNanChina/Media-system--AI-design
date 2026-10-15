@@ -2,8 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const userStore = {
   role: '',
+  roles: [],
+  highestRoles: [],
+  grantedRoles: [],
   isLoggedIn: false,
   canManageBusiness: false,
+  hasAnyRole: vi.fn(requiredRoles => requiredRoles.some(role => {
+    const normalized = role === 'ADMIN' ? 'SUPER_ADMIN' : role
+    return userStore.grantedRoles.includes(normalized)
+  })),
   checkTokenValidity: vi.fn(() => false)
 }
 
@@ -30,7 +37,14 @@ describe('route access guard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetMaintenanceStatusCache()
-    Object.assign(userStore, { role: '', isLoggedIn: false, canManageBusiness: false })
+    Object.assign(userStore, {
+      role: '',
+      roles: [],
+      highestRoles: [],
+      grantedRoles: [],
+      isLoggedIn: false,
+      canManageBusiness: false
+    })
     userStore.checkTokenValidity.mockReturnValue(false)
     requestGet.mockResolvedValue({ data: { enabled: false, unlocked: false } })
   })
@@ -53,7 +67,13 @@ describe('route access guard', () => {
   })
 
   it('rejects a role outside the route role matrix', async () => {
-    Object.assign(userStore, { role: 'MEMBER', isLoggedIn: true })
+    Object.assign(userStore, {
+      role: 'MEMBER',
+      roles: ['MEMBER'],
+      highestRoles: ['MEMBER'],
+      grantedRoles: ['MEMBER'],
+      isLoggedIn: true
+    })
     userStore.checkTokenValidity.mockReturnValue(true)
     const next = await navigate(installGuard(), {
       path: '/devices/site-config', fullPath: '/devices/site-config',
@@ -63,7 +83,14 @@ describe('route access guard', () => {
   })
 
   it('allows a matching role and redirects authenticated login visits', async () => {
-    Object.assign(userStore, { role: 'SUPER_ADMIN', isLoggedIn: true, canManageBusiness: true })
+    Object.assign(userStore, {
+      role: 'SUPER_ADMIN',
+      roles: ['SUPER_ADMIN'],
+      highestRoles: ['SUPER_ADMIN'],
+      grantedRoles: ['SUPER_ADMIN', 'DIRECTOR', 'MINISTER'],
+      isLoggedIn: true,
+      canManageBusiness: true
+    })
     userStore.checkTokenValidity.mockReturnValue(true)
     const guard = installGuard()
     const allowed = await navigate(guard, {
@@ -74,5 +101,25 @@ describe('route access guard', () => {
 
     const redirected = await navigate(guard, { path: '/login', fullPath: '/login', meta: {} })
     expect(redirected).toHaveBeenCalledWith('/dashboard')
+  })
+
+  it('does not grant access from a lower non-effective role', async () => {
+    Object.assign(userStore, {
+      role: 'DIRECTOR',
+      roles: ['DIRECTOR', 'ADVISOR'],
+      highestRoles: ['DIRECTOR'],
+      grantedRoles: ['DIRECTOR', 'MINISTER'],
+      isLoggedIn: true,
+      canManageBusiness: true
+    })
+    userStore.checkTokenValidity.mockReturnValue(true)
+
+    const next = await navigate(installGuard(), {
+      path: '/advisor-only',
+      fullPath: '/advisor-only',
+      meta: { requiresAuth: true, roles: ['ADVISOR'] }
+    })
+
+    expect(next).toHaveBeenCalledWith('/404')
   })
 })

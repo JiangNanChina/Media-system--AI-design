@@ -3,7 +3,9 @@ package com.example.photography.controller;
 import com.example.photography.dto.request.CheckinConfigurationRequest;
 import com.example.photography.dto.response.ApiResponse;
 import com.example.photography.dto.response.CheckinConfigurationResponse;
+import com.example.photography.dto.response.DynamicQrCodeResponse;
 import com.example.photography.service.CheckinConfigurationService;
+import com.example.photography.service.DynamicQrCodeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -29,6 +31,7 @@ import java.util.List;
 public class CheckinConfigurationController {
     
     private final CheckinConfigurationService configurationService;
+    private final DynamicQrCodeService dynamicQrCodeService;
     
     /**
      * 创建打卡配置
@@ -53,6 +56,16 @@ public class CheckinConfigurationController {
             @Valid @RequestBody CheckinConfigurationRequest request) {
         CheckinConfigurationResponse response = configurationService.updateConfiguration(id, request);
         return ApiResponse.success(response);
+    }
+
+    /**
+     * 签发并持久化一个短期有效的动态签到二维码。
+     */
+    @PostMapping("/{id}/qr-code")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "生成动态签到二维码", description = "签发带服务端签名和过期时间的动态二维码")
+    public ApiResponse<DynamicQrCodeResponse> issueDynamicQrCode(@PathVariable Long id) {
+        return ApiResponse.success("动态二维码生成成功", dynamicQrCodeService.issue(id));
     }
     
     /**

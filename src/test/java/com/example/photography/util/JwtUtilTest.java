@@ -1,8 +1,15 @@
 package com.example.photography.util;
 
+import com.example.photography.model.enums.UserRole;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -11,14 +18,17 @@ import static org.junit.jupiter.api.Assertions.*;
  * 验证JWT API更新后的功能
  */
 public class JwtUtilTest {
-    
+
+    private static final String TEST_SECRET =
+            "mySecretKey123456789012345678901234567890123456789012345678901234567890";
+
     private JwtUtil jwtUtil;
     
     @BeforeEach
     public void setUp() {
         jwtUtil = new JwtUtil();
         // 设置测试用的配置值
-        ReflectionTestUtils.setField(jwtUtil, "secret", "mySecretKey123456789012345678901234567890123456789012345678901234567890");
+        ReflectionTestUtils.setField(jwtUtil, "secret", TEST_SECRET);
         ReflectionTestUtils.setField(jwtUtil, "expiration", 86400000L); // 24小时
     }
     
@@ -43,6 +53,45 @@ public class JwtUtilTest {
         
         // 检查是否过期
         assertFalse(jwtUtil.isTokenExpired(token));
+    }
+
+    @Test
+    void generatedMultiRoleTokenContainsRolesAndCompatibilityRoleClaims() {
+        String token = jwtUtil.generateToken(
+                "manager",
+                List.of(UserRole.MEMBER, UserRole.ADVISOR, UserRole.MINISTER),
+                3L,
+                7
+        );
+
+        assertEquals(List.of(UserRole.MINISTER, UserRole.ADVISOR, UserRole.MEMBER),
+                jwtUtil.getRolesFromToken(token));
+        assertEquals(UserRole.MINISTER.name(), jwtUtil.getRoleFromToken(token));
+        assertEquals(7, jwtUtil.getTokenVersionFromToken(token));
+    }
+
+    @Test
+    void generatedSingleRoleTokenRemainsCompatibleWithRolesClaim() {
+        String token = jwtUtil.generateToken("advisor", UserRole.ADVISOR.name(), 4L, 2);
+
+        assertEquals(UserRole.ADVISOR.name(), jwtUtil.getRoleFromToken(token));
+        assertEquals(List.of(UserRole.ADVISOR), jwtUtil.getRolesFromToken(token));
+    }
+
+    @Test
+    void legacyTokenWithoutRolesClaimFallsBackToCompatibilityRole() {
+        Date now = new Date();
+        String legacyToken = Jwts.builder()
+                .claim("role", UserRole.ADMIN.name())
+                .claim("userId", 5L)
+                .subject("legacy-admin")
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + 86400000L))
+                .signWith(Keys.hmacShaKeyFor(TEST_SECRET.getBytes(StandardCharsets.UTF_8)), Jwts.SIG.HS512)
+                .compact();
+
+        assertEquals(List.of(UserRole.SUPER_ADMIN), jwtUtil.getRolesFromToken(legacyToken));
+        assertEquals(0, jwtUtil.getTokenVersionFromToken(legacyToken));
     }
     
     @Test

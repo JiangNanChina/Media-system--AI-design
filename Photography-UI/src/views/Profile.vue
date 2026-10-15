@@ -64,10 +64,21 @@
                 </div>
                 <div class="info-card">
                   <div class="info-label">角色</div>
-                  <div class="info-value">
-                    <el-tag :type="userInfo.role === 'ADMIN' ? 'danger' : 'primary'" size="small">
-                      {{ userInfo.role === 'ADMIN' ? '管理员' : '成员' }}
+                  <div class="info-value profile-role-tags">
+                    <el-tag
+                      v-for="role in profileRoles"
+                      :key="role"
+                      :type="roleTagType(role)"
+                      :effect="isProfileHighestRole(role) ? 'light' : 'plain'"
+                      class="profile-role-tag"
+                      size="small"
+                    >
+                      <span class="profile-role-content">
+                        <span>{{ roleLabel(role) }}</span>
+                        <span v-if="isProfileHighestRole(role)" class="profile-highest-marker">最高</span>
+                      </span>
                     </el-tag>
+                    <span v-if="profileRoles.length === 0">未分配</span>
                   </div>
                 </div>
                 <div class="info-card">
@@ -95,9 +106,22 @@
                 </div>
                 <div class="info-item">
                   <label>角色：</label>
-                  <el-tag :type="userInfo.role === 'ADMIN' ? 'danger' : 'primary'" size="small">
-                    {{ userInfo.role === 'ADMIN' ? '管理员' : '成员' }}
-                  </el-tag>
+                  <div class="profile-role-tags">
+                    <el-tag
+                      v-for="role in profileRoles"
+                      :key="role"
+                      :type="roleTagType(role)"
+                      :effect="isProfileHighestRole(role) ? 'light' : 'plain'"
+                      class="profile-role-tag"
+                      size="small"
+                    >
+                      <span class="profile-role-content">
+                        <span>{{ roleLabel(role) }}</span>
+                        <span v-if="isProfileHighestRole(role)" class="profile-highest-marker">最高</span>
+                      </span>
+                    </el-tag>
+                    <span v-if="profileRoles.length === 0">未分配</span>
+                  </div>
                 </div>
                 <div class="info-item">
                   <label>部门：</label>
@@ -390,12 +414,16 @@ import {
 import { useUserStore } from '@/stores/user'
 import request from '@/utils/request'
 import { getUploadedImageUrl } from '@/utils/imageUrl'
+import { getHighestRoles, getUserRoles, normalizeRole, roleLabel, roleTagType } from '@/utils/userRoles'
 
 const userStore = useUserStore()
 
 // 响应式数据
 const windowWidth = ref(window.innerWidth)
 const userInfo = computed(() => userStore.userInfo || {})
+const profileRoles = computed(() => getUserRoles(userInfo.value))
+const profileHighestRoles = computed(() => getHighestRoles(profileRoles.value))
+const isProfileHighestRole = role => profileHighestRoles.value.includes(normalizeRole(role))
 const isMobile = computed(() => windowWidth.value <= 768)
 
 // 头像URL计算属性
@@ -1149,11 +1177,56 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.info-list .info-item span {
+.info-list .info-item > span {
   color: #303133;
   flex: 1;
   text-align: right;
   word-break: break-all;
+}
+
+.profile-role-tags {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+
+.info-value.profile-role-tags {
+  justify-content: center;
+}
+
+.profile-role-tag {
+  max-width: 100%;
+  height: auto;
+  min-height: 24px;
+  white-space: normal;
+}
+
+.profile-role-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  line-height: 1.25;
+}
+
+.profile-highest-marker {
+  padding-left: 5px;
+  border-left: 1px solid currentColor;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.78;
+  white-space: nowrap;
+}
+
+.info-list .info-item .profile-role-tags span {
+  flex: 0 0 auto;
+  color: inherit;
+  text-align: inherit;
+  word-break: normal;
 }
 
 /* 移动端信息网格 */

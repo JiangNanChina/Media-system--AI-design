@@ -63,10 +63,13 @@ describe('Landing public page', () => {
       data: {
         settings: {
           'site.title': '测试融媒体中心',
+          'site.subtitle': '校园影像中心',
           'site.logo': '/uploads/logo.png',
           'landing.hero.media': '/uploads/hero.jpg',
           'landing.hero.title': '记录校园精彩瞬间',
           'landing.hero.subtitle': '用镜头连接青春现场',
+          'landing.nav.join_label': '成为成员',
+          'landing.hero.join_cta': '立即加入',
           'landing.submission.title': '分享你的校园故事',
           'landing.submission.description': '优秀作品将在官方平台展示',
           'landing.contact': '行政楼 203 室',
@@ -95,6 +98,9 @@ describe('Landing public page', () => {
     expect(wrapper.text()).toContain('测试融媒体中心')
     expect(wrapper.text()).toContain('记录校园精彩瞬间')
     expect(wrapper.text()).toContain('用镜头连接青春现场')
+    expect(wrapper.find('.brand-copy small').text()).toBe('校园影像中心')
+    expect(wrapper.find('.nav-panel').text()).toContain('成为成员')
+    expect(wrapper.find('.hero-actions').text()).toContain('立即加入')
     expect(wrapper.text()).toContain('大美校园')
     expect(wrapper.text()).toContain('摄影组')
     expect(wrapper.find('.showcase-carousel').exists()).toBe(true)
@@ -195,5 +201,34 @@ describe('Landing public page', () => {
 
     expect(wrapper.find('.showcase-carousel').exists()).toBe(false)
     expect(wrapper.text()).toContain('采编组')
+  })
+
+  it('uses live management data in preview mode without requesting saved public content', async () => {
+    window.history.replaceState({}, '', '/?landingPreview=1#hero')
+    const wrapper = mountLanding()
+    await flushPromises()
+
+    window.dispatchEvent(new MessageEvent('message', {
+      origin: window.location.origin,
+      source: window.parent,
+      data: {
+        type: 'landing-preview-update',
+        section: 'hero',
+        content: {
+          settings: {
+            'landing.brand.title': '未保存的实时品牌',
+            'landing.hero.title': '输入即同步到真实页面'
+          },
+          campusFeatures: [],
+          departmentShowcases: []
+        }
+      }
+    }))
+    await flushPromises()
+
+    expect(request.get).not.toHaveBeenCalledWith('/landing/public', { silent: true })
+    expect(wrapper.find('#hero-title').text()).toBe('未保存的实时品牌')
+    expect(wrapper.find('.hero-statement').text()).toBe('输入即同步到真实页面')
+    window.history.replaceState({}, '', '/')
   })
 })

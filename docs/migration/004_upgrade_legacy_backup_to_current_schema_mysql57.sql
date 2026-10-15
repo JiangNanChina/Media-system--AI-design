@@ -197,6 +197,7 @@ CREATE TABLE IF NOT EXISTS `join_applications` (
     `college` VARCHAR(160) COLLATE utf8mb4_unicode_ci NOT NULL,
     `major` VARCHAR(160) COLLATE utf8mb4_unicode_ci NOT NULL,
     `enrollment_year` INT NOT NULL,
+    `class_name` VARCHAR(80) COLLATE utf8mb4_unicode_ci NOT NULL,
     `self_introduction` TEXT COLLATE utf8mb4_unicode_ci NOT NULL,
     `work_original_filename` VARCHAR(255) COLLATE utf8mb4_unicode_ci NULL,
     `work_stored_filename` VARCHAR(255) COLLATE utf8mb4_unicode_ci NULL,
@@ -288,4 +289,3 @@ WHERE NOT EXISTS (
 );
 
 SET FOREIGN_KEY_CHECKS = 1;
-

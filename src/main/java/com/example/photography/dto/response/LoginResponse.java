@@ -3,6 +3,8 @@ package com.example.photography.dto.response;
 import com.example.photography.model.enums.UserRole;
 import com.example.photography.model.enums.AccountStatus;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /**
  * 登录响应DTO
@@ -14,6 +16,7 @@ public class LoginResponse {
     private String realName;
     private String email;
     private UserRole role;
+    private Set<UserRole> roles = new LinkedHashSet<>();
     private Long userId;
     private String departmentName;
     private String avatarUrl;
@@ -76,6 +79,14 @@ public class LoginResponse {
     
     public void setRole(UserRole role) {
         this.role = role;
+    }
+
+    public Set<UserRole> getRoles() {
+        return roles;
+    }
+
+    public void setRoles(Set<UserRole> roles) {
+        this.roles = roles == null ? new LinkedHashSet<>() : new LinkedHashSet<>(roles);
     }
     
     public Long getUserId() {

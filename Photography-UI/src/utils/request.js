@@ -1,12 +1,19 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
+import { getRequestErrorMessage } from '@/utils/requestError'
 
 const request = axios.create({
   baseURL: '/api',
   timeout: 30_000,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json;charset=UTF-8' }
+})
+
+const showRequestError = message => ElMessage({
+  type: 'error',
+  message,
+  grouping: true
 })
 
 request.interceptors.request.use((config) => {
@@ -46,11 +53,12 @@ request.interceptors.response.use((response) => {
       window.location.assign(`/maintenance?redirect=${encodeURIComponent(current)}`)
     }
   } else if (!config.silent) {
-    if (status === 401) ElMessage.error('登录已过期，请重新登录')
-    else if (status === 403) ElMessage.error('权限不足')
-    else if (status === 404) ElMessage.error('请求的资源不存在')
-    else if (error.code === 'ECONNABORTED') ElMessage.error('请求超时，请稍后重试')
-    else ElMessage.error(message || error.message || '网络连接失败')
+    showRequestError(getRequestErrorMessage({
+      status,
+      serverMessage: message,
+      errorCode: error.code,
+      fallbackMessage: error.message
+    }))
   }
   return Promise.reject(error)
 })

@@ -13,7 +13,7 @@
         </span>
         <span class="brand-copy">
           <strong>{{ brandTitle }}</strong>
-          <small>Campus media center</small>
+          <small>{{ brandSubtitle }}</small>
         </span>
       </router-link>
 
@@ -23,7 +23,7 @@
           <a href="#features" @click="menuOpen = false">{{ setting('landing.nav.features_label', '校园特色') }}</a>
           <a href="#showcase" @click="menuOpen = false">{{ setting('landing.nav.showcase_label', '部门风采') }}</a>
           <router-link to="/submission" @click="menuOpen = false">{{ setting('landing.nav.submission_label', '视频投稿') }}</router-link>
-          <router-link to="/join-us" @click="menuOpen = false">加入我们</router-link>
+          <router-link to="/join-us" @click="menuOpen = false">{{ setting('landing.nav.join_label', '加入我们') }}</router-link>
         </nav>
 
         <el-button class="nav-login" type="primary" @click="enterPlatform">
@@ -100,7 +100,7 @@
             </el-button>
             <el-button class="secondary-action" size="large" @click="$router.push('/join-us')">
               <el-icon><UserFilled /></el-icon>
-              加入我们
+              {{ setting('landing.hero.join_cta', '加入我们') }}
             </el-button>
             <button class="text-action" type="button" @click="scrollTo('features')">
               {{ setting('landing.hero.secondary_cta', '了解我们') }}
@@ -219,7 +219,7 @@
         </div>
       </section>
 
-      <section class="submit-section" aria-labelledby="submission-title">
+      <section id="submission" class="submit-section" aria-labelledby="submission-title">
         <div class="submit-card section-shell" data-reveal>
           <div class="submit-copy">
             <div class="section-label">
@@ -287,7 +287,7 @@
       </section>
     </main>
 
-    <footer class="landing-footer" aria-label="站点页尾">
+    <footer id="footer" class="landing-footer" aria-label="站点页尾">
       <div class="footer-inner section-shell">
         <section class="footer-about" data-reveal>
           <div class="footer-brand">
@@ -480,6 +480,7 @@ const brandTitle = computed(() => {
   if (configuredTitle) return configuredTitle
   return /融媒体.*管理系统/.test(siteTitle.value) ? '融媒体中心' : siteTitle.value
 })
+const brandSubtitle = computed(() => setting('site.subtitle', 'Campus media center'))
 const logoUrl = computed(() => mediaUrl(setting('site.logo')) || '/logo.svg')
 const heroMedia = computed(() => mediaUrl(setting('landing.hero.media') || setting('login.background')))
 const heroIsVideo = computed(() => setting('landing.hero.media_type') === 'video' || /\.(mp4|mov|webm)(\?|$)/i.test(heroMedia.value))
@@ -700,6 +701,37 @@ const enterPlatform = () => {
   router.push(userStore.isLoggedIn ? '/dashboard' : '/login')
 }
 
+const previewMode = typeof window !== 'undefined'
+  && new URLSearchParams(window.location.search).get('landingPreview') === '1'
+
+let syncedPreviewSection = ''
+
+const syncPreviewSection = requestedSection => {
+  if (!previewMode) return
+  const sectionId = requestedSection || window.location.hash.slice(1) || 'hero'
+  if (sectionId === syncedPreviewSection) return
+
+  const section = document.getElementById(sectionId)
+  if (!section) return
+
+  // Keep section navigation inside the preview iframe. `scrollIntoView()` can
+  // scroll an embedding ancestor as well, which moves the management form
+  // while the user is typing into a setting.
+  const top = Math.max(0, section.getBoundingClientRect().top + window.scrollY)
+  window.scrollTo(0, top)
+  syncedPreviewSection = sectionId
+}
+
+const handlePreviewUpdate = async event => {
+  if (!previewMode || event.origin !== window.location.origin || event.source !== window.parent) return
+  if (event.data?.type !== 'landing-preview-update') return
+  Object.assign(content, event.data.content || {})
+  document.title = brandTitle.value
+  await nextTick()
+  setupRevealObserver()
+  syncPreviewSection(event.data.section)
+}
+
 onMounted(async () => {
   pageReady.value = true
   window.addEventListener('scroll', scheduleScrollProgress, { passive: true })
@@ -707,6 +739,13 @@ onMounted(async () => {
   updateScrollProgress()
   await nextTick()
   setupRevealObserver()
+
+  if (previewMode) {
+    window.addEventListener('message', handlePreviewUpdate)
+    window.parent.postMessage({ type: 'landing-preview-ready' }, window.location.origin)
+    syncPreviewSection()
+    return
+  }
 
   try {
     const response = await request.get('/landing/public', { silent: true })
@@ -730,6 +769,7 @@ onBeforeUnmount(() => {
   revealCompleteTimers.clear()
   window.removeEventListener('scroll', scheduleScrollProgress)
   window.removeEventListener('resize', scheduleScrollProgress)
+  window.removeEventListener('message', handlePreviewUpdate)
   if (pointerFrame != null) window.cancelAnimationFrame(pointerFrame)
   if (scrollFrame != null) window.cancelAnimationFrame(scrollFrame)
   pointerFrame = null

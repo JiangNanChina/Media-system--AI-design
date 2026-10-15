@@ -22,7 +22,7 @@ public interface UserDeviceRepository extends JpaRepository<UserDevice, Long> {
     /**
      * 查找用户的激活设备
      */
-    @Query("SELECT ud FROM UserDevice ud JOIN FETCH ud.user WHERE ud.user = :user AND ud.isActive = true AND ud.deleted = false")
+    @Query("SELECT ud FROM UserDevice ud JOIN FETCH ud.user WHERE ud.user = :user AND ud.isActive = true AND ud.bindStatus = 'ACTIVE' AND ud.deleted = false")
     Optional<UserDevice> findActiveDeviceByUser(@Param("user") User user);
     
     /**
@@ -46,7 +46,7 @@ public interface UserDeviceRepository extends JpaRepository<UserDevice, Long> {
     /**
      * 根据用户ID查找所有激活设备
      */
-    @Query("SELECT ud FROM UserDevice ud JOIN FETCH ud.user WHERE ud.user.id = :userId AND ud.isActive = true AND ud.deleted = false")
+    @Query("SELECT ud FROM UserDevice ud JOIN FETCH ud.user WHERE ud.user.id = :userId AND ud.isActive = true AND ud.bindStatus = 'ACTIVE' AND ud.deleted = false")
     List<UserDevice> findAllByUser_IdAndIsActiveTrueAndDeletedFalse(@Param("userId") Long userId);
     
     /**
@@ -58,19 +58,19 @@ public interface UserDeviceRepository extends JpaRepository<UserDevice, Long> {
     /**
      * 查找用户在指定类型集合中的激活设备
      */
-    @Query("SELECT ud FROM UserDevice ud JOIN FETCH ud.user WHERE ud.user = :user AND ud.isActive = true AND ud.deleted = false AND ud.deviceType IN (:types)")
+    @Query("SELECT ud FROM UserDevice ud JOIN FETCH ud.user WHERE ud.user = :user AND ud.isActive = true AND ud.bindStatus = 'ACTIVE' AND ud.deleted = false AND ud.deviceType IN (:types)")
     List<UserDevice> findActiveDevicesByUserAndTypes(@Param("user") User user, @Param("types") Collection<UserDevice.DeviceType> types);
 
     /**
      * 根据用户与指纹查找激活设备
      */
-    @Query("SELECT ud FROM UserDevice ud JOIN FETCH ud.user WHERE ud.user = :user AND ud.isActive = true AND ud.deleted = false AND ud.deviceFingerprint = :fingerprint")
+    @Query("SELECT ud FROM UserDevice ud JOIN FETCH ud.user WHERE ud.user = :user AND ud.isActive = true AND ud.bindStatus = 'ACTIVE' AND ud.deleted = false AND ud.deviceFingerprint = :fingerprint")
     Optional<UserDevice> findActiveByUserAndDeviceFingerprint(@Param("user") User user, @Param("fingerprint") String fingerprint);
     
     /**
      * 检查用户是否已绑定设备
      */
-    @Query("SELECT COUNT(ud) > 0 FROM UserDevice ud WHERE ud.user = :user AND ud.isActive = true AND ud.deleted = false")
+    @Query("SELECT COUNT(ud) > 0 FROM UserDevice ud WHERE ud.user = :user AND ud.isActive = true AND ud.bindStatus = 'ACTIVE' AND ud.deleted = false")
     boolean hasActiveDevice(@Param("user") User user);
     
     /**
@@ -102,7 +102,7 @@ public interface UserDeviceRepository extends JpaRepository<UserDevice, Long> {
     /**
      * 查找所有激活的设备
      */
-    @Query("SELECT ud FROM UserDevice ud JOIN FETCH ud.user WHERE ud.isActive = true AND ud.deleted = false ORDER BY ud.lastActiveAt DESC")
+    @Query("SELECT ud FROM UserDevice ud JOIN FETCH ud.user WHERE ud.isActive = true AND ud.bindStatus = 'ACTIVE' AND ud.deleted = false ORDER BY ud.lastActiveAt DESC")
     List<UserDevice> findAllActiveDevices();
     
     /**
@@ -135,4 +135,11 @@ public interface UserDeviceRepository extends JpaRepository<UserDevice, Long> {
      */
     @Query("SELECT ud FROM UserDevice ud WHERE ud.user = :user AND ud.deviceType = :deviceType AND ud.isActive = false AND ud.deleted = false ORDER BY ud.lastActiveAt DESC")
     List<UserDevice> findSuspendedDevicesByUserAndType(@Param("user") User user, @Param("deviceType") UserDevice.DeviceType deviceType);
+
+    /**
+     * 查找移动设备槽位中所有已停用设备（手机和平板属于同一槽位）。
+     */
+    @Query("SELECT ud FROM UserDevice ud WHERE ud.user = :user AND ud.deviceType IN (:types) AND ud.isActive = false AND ud.deleted = false ORDER BY ud.lastActiveAt DESC")
+    List<UserDevice> findSuspendedDevicesByUserAndTypes(@Param("user") User user,
+                                                        @Param("types") Collection<UserDevice.DeviceType> types);
 }

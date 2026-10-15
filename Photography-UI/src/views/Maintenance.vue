@@ -1,82 +1,167 @@
 <template>
-  <div class="maintenance-page">
-    <div class="grain-layer" aria-hidden="true"></div>
-    <div class="light light-a" aria-hidden="true"></div>
-    <div class="light light-b" aria-hidden="true"></div>
+  <div :class="['maintenance-page', { 'is-ready': pageReady }]">
+    <header class="maintenance-header">
+      <router-link to="/" class="maintenance-brand" aria-label="返回公开站点">
+        <span class="brand-mark">
+          <img v-if="siteLogo" :src="siteLogo" alt="" />
+          <el-icon v-else><Camera /></el-icon>
+        </span>
+        <span class="brand-copy">
+          <strong>{{ brandTitle }}</strong>
+          <small>{{ brandSubtitle }}</small>
+        </span>
+      </router-link>
 
-    <router-link to="/" class="public-link">
-      <el-icon><ArrowLeft /></el-icon>
-      <span>浏览公开站点</span>
-    </router-link>
+      <div class="header-status" aria-label="管理平台当前状态">
+        <span class="status-light"></span>
+        <span>管理平台维护中</span>
+      </div>
 
-    <section class="maintenance-shell" aria-label="维护访问">
-      <aside class="visual-panel" aria-hidden="true">
-        <div class="lens-mark">
-          <el-icon><Camera /></el-icon>
+      <router-link to="/" class="public-link">
+        <el-icon><View /></el-icon>
+        <span>浏览公开站点</span>
+        <el-icon class="public-link-arrow"><Right /></el-icon>
+      </router-link>
+    </header>
+
+    <main class="maintenance-main">
+      <section class="maintenance-content" aria-labelledby="maintenance-title">
+        <div class="service-reference" aria-hidden="true">
+          <span>SERVICE NOTICE</span>
+          <strong>503</strong>
         </div>
-        <div class="photo-frame">
-          <div class="frame-top">
-            <span>STUDIO</span>
-            <span>PRIVATE</span>
-          </div>
-          <span class="track-glow"></span>
-          <div class="focus-ring">
-            <span class="focus-dot"></span>
-          </div>
-          <div class="scan-line"></div>
+
+        <div class="notice-heading">
+          <span class="notice-label">管理平台维护窗口</span>
+          <h1 id="maintenance-title">{{ status.title || '系统维护中' }}</h1>
+          <p class="maintenance-message">
+            {{ status.message || '管理平台正在维护，公开站点仍可正常浏览。' }}
+          </p>
         </div>
-        <div class="panel-status">
-          <span class="pulse-dot"></span>
-          <span>公开作品集保持在线</span>
+
+        <div class="service-board" aria-label="服务状态">
+          <div class="service-row is-online">
+            <span class="service-icon"><el-icon><CircleCheck /></el-icon></span>
+            <span class="service-copy">
+              <strong>公开站点</strong>
+              <small>作品展示与公开内容可正常访问</small>
+            </span>
+            <span class="service-state">运行正常</span>
+          </div>
+          <div class="service-row is-paused">
+            <span class="service-icon"><el-icon><Tools /></el-icon></span>
+            <span class="service-copy">
+              <strong>管理平台</strong>
+              <small>登录与管理功能暂时停止服务</small>
+            </span>
+            <span class="service-state">维护中</span>
+          </div>
+        </div>
+
+        <div class="maintenance-progress" aria-label="维护进度">
+          <div class="progress-track" aria-hidden="true"><span></span></div>
+          <div class="progress-labels">
+            <span class="is-complete"><i></i>维护已开始</span>
+            <span class="is-current"><i></i>服务检查中</span>
+            <span><i></i>恢复访问</span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="access-panel" aria-labelledby="access-title">
+        <div class="access-panel-head">
+          <span class="access-icon"><el-icon><Lock /></el-icon></span>
+          <span class="access-number">ACCESS / 01</span>
+        </div>
+
+        <div class="access-copy">
+          <p>临时通行</p>
+          <h2 id="access-title">维护人员入口</h2>
+          <span>拥有维护密码的人员可临时进入，随后仍需使用个人账号登录。</span>
+        </div>
+
+        <form class="unlock-form" @submit.prevent="unlock">
+          <label for="maintenance-password">维护密码</label>
+          <div class="unlock-control">
+            <el-input
+              id="maintenance-password"
+              v-model="password"
+              type="password"
+              show-password
+              autocomplete="current-password"
+              placeholder="至少输入 8 位密码"
+              aria-describedby="maintenance-password-hint"
+            >
+              <template #prefix><el-icon><Key /></el-icon></template>
+            </el-input>
+            <el-button
+              type="primary"
+              native-type="submit"
+              :loading="loading"
+              :disabled="password.length < 8"
+            >
+              验证并继续
+              <el-icon><Right /></el-icon>
+            </el-button>
+          </div>
+          <p id="maintenance-password-hint" class="unlock-hint">
+            维护密码不会替代个人账号验证。
+          </p>
+        </form>
+
+        <div class="access-foot">
+          <el-icon><InfoFilled /></el-icon>
+          <span>无维护权限时，请等待服务恢复后再登录。</span>
         </div>
       </aside>
+    </main>
 
-      <main class="access-card">
-        <div class="status-header">
-          <div class="status-icon"><el-icon><Tools /></el-icon></div>
-          <div>
-            <span>MAINTENANCE ACCESS</span>
-            <strong>临时维护入口</strong>
-          </div>
-        </div>
-        <h1>{{ status.title || '系统维护中' }}</h1>
-        <p>{{ status.message || '管理平台正在维护，公开站点仍可正常浏览。' }}</p>
-        <div class="quick-notes">
-          <div>
-            <el-icon><CircleCheck /></el-icon>
-            <span>公开站点可访问</span>
-          </div>
-          <div>
-            <el-icon><Timer /></el-icon>
-            <span>维护完成后恢复登录</span>
-          </div>
-        </div>
-        <el-alert class="maintenance-alert" title="维护密码仅提供临时通行，进入后仍需使用个人账号登录。" type="info" :closable="false" show-icon />
-        <el-form class="unlock-form" @submit.prevent="unlock">
-          <el-input v-model="password" type="password" show-password size="large" placeholder="输入维护密码" @keyup.enter="unlock">
-            <template #prefix><el-icon><Lock /></el-icon></template>
-          </el-input>
-          <el-button type="primary" size="large" :loading="loading" :disabled="password.length < 8" @click="unlock">验证并继续</el-button>
-        </el-form>
-      </main>
-    </section>
+    <footer class="maintenance-footer">
+      <span>STATUS / TEMPORARILY UNAVAILABLE</span>
+      <span>公开内容保持在线</span>
+    </footer>
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Camera, CircleCheck, Lock, Timer, Tools } from '@element-plus/icons-vue'
+import {
+  Camera,
+  CircleCheck,
+  InfoFilled,
+  Key,
+  Lock,
+  Right,
+  Tools,
+  View
+} from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import request from '@/utils/request'
+import { getSiteImageUrl } from '@/utils/imageUrl'
 
 const route = useRoute()
 const router = useRouter()
 const status = reactive({ enabled: true, title: '', message: '', unlocked: false })
+const landingSettings = reactive({})
 const password = ref('')
 const loading = ref(false)
+const pageReady = ref(false)
+
+const setting = (key, fallback = '') => landingSettings[key] || fallback
+const siteTitle = computed(() => setting('site.title', '融媒体中心'))
+const brandTitle = computed(() => {
+  const configuredTitle = setting('landing.brand.title')
+  if (configuredTitle) return configuredTitle
+  return /融媒体.*管理系统/.test(siteTitle.value) ? '融媒体中心' : siteTitle.value
+})
+const brandSubtitle = computed(() => setting('site.subtitle', 'Campus media center'))
+const siteLogo = computed(() => getSiteImageUrl(setting('site.logo')))
+
 const target = () => typeof route.query.redirect === 'string' ? route.query.redirect : '/login'
+
 const unlock = async () => {
+  if (loading.value || password.value.length < 8) return
   loading.value = true
   try {
     await request.post('/maintenance/public/unlock', { password: password.value }, { skipAuthRefresh: true })
@@ -88,530 +173,891 @@ const unlock = async () => {
 }
 
 onMounted(async () => {
-  const response = await request.get('/maintenance/public/status', { silent: true })
-  Object.assign(status, response.data || {})
-  if (!status.enabled || status.unlocked) router.replace(target())
+  const [statusResult, landingResult] = await Promise.allSettled([
+    request.get('/maintenance/public/status', { silent: true }),
+    request.get('/landing/public', { silent: true })
+  ])
+
+  if (landingResult.status === 'fulfilled') {
+    Object.assign(landingSettings, landingResult.value.data?.settings || {})
+  }
+
+  if (statusResult.status === 'fulfilled') {
+    Object.assign(status, statusResult.value.data || {})
+    if (!status.enabled || status.unlocked) {
+      router.replace(target())
+      return
+    }
+  }
+
+  pageReady.value = true
 })
 </script>
 
 <style scoped>
 .maintenance-page {
+  --page-bg: #edf0ed;
+  --page-surface: #f8faf7;
+  --page-ink: #15201d;
+  --page-muted: #66716d;
+  --page-line: #c9d0cc;
+  --page-dark: #17221f;
+  --page-green: #28725c;
+  --page-green-soft: #dceae4;
+  --page-amber: #d7922c;
+  --page-amber-soft: #f3e5cb;
+  --page-body: "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+  --page-display: "Arial Black", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --page-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
   position: relative;
   z-index: 2;
-  min-height: 100vh;
+  min-height: 100svh;
+  overflow-x: hidden;
+  color: var(--page-ink);
+  background:
+    linear-gradient(rgba(21, 32, 29, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(21, 32, 29, 0.035) 1px, transparent 1px),
+    var(--page-bg);
+  background-size: 48px 48px;
+  font-family: var(--page-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+.maintenance-page *,
+.maintenance-page *::before,
+.maintenance-page *::after {
+  box-sizing: border-box;
+}
+
+.maintenance-page :is(h1, h2, p) {
+  margin: 0;
+}
+
+.maintenance-page::before {
+  position: fixed;
+  z-index: 0;
+  top: 84px;
+  bottom: 54px;
+  left: 0;
+  width: min(24vw, 360px);
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(215, 146, 44, 0.055), transparent);
+  transform: translateX(-120%);
+  animation: background-diagnostic-sweep 13s ease-in-out infinite;
+  will-change: transform;
+}
+
+.maintenance-header {
+  position: relative;
+  z-index: 2;
+  min-height: 84px;
+  padding: 16px clamp(24px, 4vw, 64px);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 24px;
+  background: rgba(248, 250, 247, 0.92);
+  border-top: 4px solid var(--page-amber);
+  border-bottom: 1px solid var(--page-line);
+}
+
+.maintenance-brand {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  justify-self: start;
+  color: inherit;
+  text-decoration: none;
+}
+
+.brand-mark {
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
+  flex: 0 0 auto;
   overflow: hidden;
-  padding: 88px 24px 40px;
-  color: #112533;
-  background:
-    radial-gradient(circle at 14% 16%, rgba(100, 200, 232, .28), transparent 30%),
-    radial-gradient(circle at 88% 78%, rgba(230, 204, 155, .26), transparent 27%),
-    linear-gradient(135deg, #071923 0%, #0e3340 48%, #172119 100%);
-}
-
-.grain-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: .32;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, .045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px);
-  background-size: 58px 58px;
-  mask-image: radial-gradient(circle at center, black 0%, transparent 76%);
-}
-
-.light {
-  position: absolute;
-  width: 380px;
-  height: 380px;
+  color: #ffffff;
+  background: var(--page-dark);
   border-radius: 50%;
-  filter: blur(18px);
-  opacity: .58;
-  pointer-events: none;
 }
 
-.light-a {
-  top: 11%;
-  left: 8%;
-  background: radial-gradient(circle, rgba(80, 183, 213, .36), transparent 66%);
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  outline: 1px solid oklch(0 0 0 / 0.1);
+  outline-offset: -1px;
 }
 
-.light-b {
-  right: 9%;
-  bottom: 8%;
-  background: radial-gradient(circle, rgba(255, 215, 150, .28), transparent 68%);
+.brand-mark .el-icon {
+  font-size: 21px;
+}
+
+.brand-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.brand-copy strong {
+  overflow: hidden;
+  font-family: var(--page-display);
+  font-size: 16px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brand-copy small,
+.service-reference,
+.access-number,
+.maintenance-footer {
+  font-family: var(--page-mono);
+}
+
+.brand-copy small {
+  overflow: hidden;
+  color: var(--page-muted);
+  font-size: 9px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.header-status {
+  min-height: 34px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #86591b;
+  background: var(--page-amber-soft);
+  border: 1px solid #dfc18d;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-light {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  background: var(--page-amber);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(215, 146, 44, 0.16);
+}
+
+.status-light::after {
+  position: absolute;
+  inset: -6px;
+  content: "";
+  border: 1px solid rgba(215, 146, 44, 0.58);
+  border-radius: 50%;
+  animation: status-signal 2.4s ease-out infinite;
 }
 
 .public-link {
-  position: fixed;
-  top: 26px;
-  left: 30px;
-  z-index: 3;
+  min-height: 42px;
+  padding: 0 15px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  min-height: 38px;
-  padding: 0 14px;
-  color: rgba(232, 247, 249, .88);
+  justify-self: end;
+  color: var(--page-ink);
+  background: transparent;
+  border: 1px solid #9fa9a4;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 700;
   text-decoration: none;
-  border: 1px solid rgba(255, 255, 255, .16);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, .08);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, .16);
-  transition: color .2s ease, border-color .2s ease, background .2s ease;
+  transition: color 150ms ease-out, background-color 150ms ease-out, border-color 150ms ease-out, transform 150ms ease-out;
+}
+
+.public-link .el-icon {
+  font-size: 16px;
+}
+
+.public-link-arrow {
+  color: var(--page-amber);
+  transition: transform 150ms ease-out;
 }
 
 .public-link:hover,
 .public-link:focus-visible {
   color: #ffffff;
-  border-color: rgba(169, 226, 240, .55);
-  background: rgba(255, 255, 255, .13);
+  background: var(--page-dark);
+  border-color: var(--page-dark);
+  outline: none;
+  transform: translateY(-1px);
 }
 
-.maintenance-shell {
+.public-link:hover .public-link-arrow,
+.public-link:focus-visible .public-link-arrow {
+  transform: translateX(3px);
+}
+
+.public-link:active {
+  transform: scale(0.96);
+}
+
+.maintenance-main {
   position: relative;
   z-index: 1;
-  width: min(960px, 100%);
+  width: min(calc(100% - 64px), 1280px);
+  min-height: calc(100svh - 138px);
+  margin-inline: auto;
+  padding: clamp(56px, 8vh, 96px) 0;
   display: grid;
-  grid-template-columns: minmax(280px, .86fr) minmax(400px, 1fr);
-  border: 1px solid rgba(218, 237, 239, .2);
-  border-radius: 8px;
-  overflow: hidden;
-  background: rgba(246, 251, 250, .94);
-  box-shadow: 0 30px 90px rgba(0, 0, 0, .34);
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.65fr);
+  align-items: center;
+  gap: clamp(56px, 8vw, 120px);
 }
 
-.visual-panel {
-  position: relative;
-  min-height: 520px;
-  padding: 36px;
-  color: #eefafa;
-  background:
-    linear-gradient(180deg, rgba(7, 25, 35, .08), rgba(7, 25, 35, .72)),
-    radial-gradient(circle at 40% 36%, rgba(119, 209, 226, .34), transparent 32%),
-    linear-gradient(145deg, #102b34 0%, #183d40 52%, #202315 100%);
+.maintenance-content {
+  min-width: 0;
 }
 
-.visual-panel::before {
-  position: absolute;
-  inset: 24px;
-  content: "";
-  border: 1px solid rgba(255, 255, 255, .16);
-  border-radius: 6px;
+.service-reference,
+.notice-heading,
+.service-board,
+.maintenance-progress,
+.access-panel {
+  opacity: 0;
+  filter: blur(4px);
+  transform: translateY(18px);
+  transition: opacity 460ms ease-out, filter 460ms ease-out, transform 560ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.lens-mark {
-  position: relative;
-  z-index: 1;
-  width: 56px;
-  height: 56px;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, .24);
-  border-radius: 50%;
-  color: #bff4ff;
-  background: rgba(255, 255, 255, .1);
-  box-shadow: inset 0 0 28px rgba(255, 255, 255, .08);
-  font-size: 25px;
+.access-panel {
+  transform: translateX(24px);
 }
 
-.photo-frame {
-  position: absolute;
-  left: 36px;
-  right: 36px;
-  bottom: 96px;
-  height: 300px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, .18);
-  background:
-    linear-gradient(rgba(255, 255, 255, .11) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, .11) 1px, transparent 1px),
-    linear-gradient(135deg, rgba(23, 79, 91, .45), rgba(7, 18, 26, .88));
-  background-size: 76px 76px, 76px 76px, auto;
-  box-shadow: inset 0 0 70px rgba(0, 0, 0, .34);
+.is-ready :is(.service-reference, .notice-heading, .service-board, .maintenance-progress, .access-panel) {
+  opacity: 1;
+  filter: blur(0);
+  transform: translate(0, 0);
 }
 
-.frame-top {
-  position: absolute;
-  top: 18px;
-  left: 20px;
-  right: 20px;
+.is-ready .notice-heading { transition-delay: 70ms; }
+.is-ready .service-board { transition-delay: 140ms; }
+.is-ready .maintenance-progress { transition-delay: 210ms; }
+.is-ready .access-panel { transition-delay: 120ms; }
+
+.service-reference {
   display: flex;
+  align-items: flex-end;
   justify-content: space-between;
-  color: rgba(239, 250, 250, .72);
-  font-size: 11px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--page-line);
+  color: var(--page-muted);
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: .14em;
-  z-index: 3;
 }
 
-.track-glow {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 1;
-  width: 92px;
-  height: 92px;
-  border-radius: 50%;
-  pointer-events: none;
-  opacity: .88;
-  transform: translate(-50%, -50%) translate(-58px, -24px) scale(.92);
-  background:
-    radial-gradient(circle at 50% 50%, rgba(255, 246, 219, .96) 0 8%, rgba(248, 220, 168, .58) 14%, rgba(248, 220, 168, .18) 36%, transparent 67%);
-  filter: blur(1.5px);
-  mix-blend-mode: screen;
+.service-reference strong {
+  color: #aab2ae;
+  font-size: 42px;
+  line-height: 0.78;
+  font-variant-numeric: tabular-nums;
+  animation: service-code-active 3.6s ease-in-out infinite;
 }
 
-.focus-ring {
-  position: absolute;
-  inset: 86px 76px;
-  z-index: 2;
-  border: 1px solid rgba(255, 255, 255, .58);
-  border-radius: 50%;
-  box-shadow: 0 0 0 18px rgba(255, 255, 255, .03), 0 0 55px rgba(157, 235, 246, .28);
+.notice-heading {
+  padding: 34px 0 38px;
 }
 
-.focus-ring::before {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  content: "";
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-}
-
-.focus-ring::before {
-  width: 46%;
-  height: 46%;
-  border: 1px solid rgba(255, 255, 255, .34);
-}
-
-.focus-dot {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 8px;
-  height: 8px;
-  transform: translate(-50%, -50%);
-  background: #f8dca8;
-  border-radius: 50%;
-  box-shadow: 0 0 22px rgba(248, 220, 168, .9);
-}
-
-.focus-dot::before {
-  position: absolute;
-  inset: -8px;
-  content: "";
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(248, 220, 168, .34), transparent 66%);
-}
-
-.scan-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 48%;
-  z-index: 3;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(173, 240, 248, .8), transparent);
-}
-
-.panel-status {
-  position: absolute;
-  left: 36px;
-  right: 36px;
-  bottom: 36px;
-  z-index: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 999px;
-  color: rgba(239, 250, 250, .86);
-  background: rgba(7, 20, 29, .38);
-  border: 1px solid rgba(255, 255, 255, .14);
-  backdrop-filter: blur(14px);
-}
-
-.pulse-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #8df0bf;
-  box-shadow: 0 0 0 7px rgba(141, 240, 191, .14), 0 0 22px rgba(141, 240, 191, .68);
-}
-
-.access-card {
-  padding: 52px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, .94), rgba(245, 250, 249, .94)),
-    radial-gradient(circle at 88% 12%, rgba(42, 147, 181, .12), transparent 34%);
-}
-
-.status-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 28px;
-}
-
-.status-icon {
-  width: 58px;
-  height: 58px;
-  display: grid;
-  place-items: center;
-  flex: 0 0 auto;
-  background: linear-gradient(145deg, #e5f8fa, #f5fbfb);
-  color: #0a7b99;
-  border: 1px solid #d5eef3;
-  border-radius: 8px;
-  font-size: 27px;
-  box-shadow: 0 14px 34px rgba(15, 125, 153, .13);
-}
-
-.status-header span {
-  display: block;
-  color: #0a7b99;
+.notice-label {
+  display: inline-block;
+  margin-bottom: 15px;
+  color: var(--page-green);
   font-size: 12px;
   font-weight: 800;
-  letter-spacing: .12em;
 }
 
-.status-header strong {
+.notice-heading h1 {
+  max-width: 720px;
+  font-family: var(--page-display);
+  font-size: clamp(48px, 6vw, 78px);
+  font-weight: 900;
+  line-height: 1.03;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.maintenance-message {
+  max-width: 680px;
+  margin-top: 20px !important;
+  color: var(--page-muted);
+  font-size: 16px;
+  line-height: 1.85;
+  text-wrap: pretty;
+}
+
+.service-board {
+  border-top: 1px solid var(--page-line);
+}
+
+.service-row {
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--page-line);
+}
+
+.service-icon {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 17px;
+}
+
+.is-paused .service-icon .el-icon {
+  animation: maintenance-gear 7s linear infinite;
+}
+
+.is-online .service-icon {
+  color: var(--page-green);
+  background: var(--page-green-soft);
+}
+
+.is-paused .service-icon {
+  color: #8b5e1d;
+  background: var(--page-amber-soft);
+}
+
+.service-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.service-copy strong {
+  font-size: 14px;
+}
+
+.service-copy small {
+  overflow: hidden;
+  color: var(--page-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.service-state {
+  padding: 5px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.is-online .service-state {
+  color: var(--page-green);
+  background: var(--page-green-soft);
+}
+
+.is-paused .service-state {
+  color: #8b5e1d;
+  background: var(--page-amber-soft);
+}
+
+.maintenance-progress {
+  margin-top: 34px;
+}
+
+.progress-track {
+  height: 3px;
+  overflow: hidden;
+  background: #d5dad7;
+}
+
+.progress-track span {
+  position: relative;
   display: block;
-  margin-top: 5px;
-  color: #263f49;
-  font-size: 15px;
+  width: 58%;
+  height: 100%;
+  background: var(--page-amber);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 900ms cubic-bezier(0.16, 1, 0.3, 1) 260ms;
+}
+
+.progress-track span::after {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 34%;
+  content: "";
+  background: rgba(255, 255, 255, 0.76);
+  transform: translateX(-120%);
+  animation: progress-sweep 2.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+.is-ready .progress-track span {
+  transform: scaleX(1);
+}
+
+.progress-labels {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  color: #909895;
+  font-size: 11px;
   font-weight: 700;
 }
 
-h1 {
-  margin: 0 0 14px;
-  color: #102936;
-  font-size: clamp(34px, 5vw, 50px);
-  line-height: 1.08;
-  letter-spacing: 0;
+.progress-labels span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
-.access-card > p {
-  max-width: 460px;
-  margin: 0 0 24px;
-  color: #526c77;
-  font-size: 16px;
-  line-height: 1.8;
+.progress-labels span:nth-child(2) {
+  justify-content: center;
 }
 
-.quick-notes {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 24px;
+.progress-labels span:last-child {
+  justify-content: flex-end;
 }
 
-.quick-notes div {
+.progress-labels i {
+  width: 6px;
+  height: 6px;
+  background: currentColor;
+  border-radius: 50%;
+}
+
+.progress-labels .is-complete {
+  color: var(--page-green);
+}
+
+.progress-labels .is-current {
+  color: #9a671d;
+}
+
+.access-panel {
+  position: relative;
+  min-width: 0;
+  padding: 32px;
+  overflow: hidden;
+  isolation: isolate;
+  color: #ffffff;
+  background: var(--page-dark);
+  border-radius: 6px;
+  box-shadow: 0 24px 70px rgba(21, 32, 29, 0.2);
+  transition-property: opacity, filter, transform, box-shadow;
+}
+
+.access-panel::before {
+  position: absolute;
+  z-index: -1;
+  top: -34%;
+  right: 0;
+  left: 0;
+  height: 26%;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(215, 146, 44, 0.075), transparent);
+  transform: translateY(0);
+  animation: panel-diagnostic-scan 5.6s ease-in-out infinite;
+  will-change: transform;
+}
+
+.access-panel:focus-within {
+  box-shadow: 0 28px 80px rgba(21, 32, 29, 0.25), 0 0 0 1px rgba(215, 146, 44, 0.34);
+  transition-delay: 0ms;
+  transition-duration: 150ms;
+}
+
+.access-panel-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 42px;
-  padding: 0 12px;
-  color: #31505b;
-  border: 1px solid #dcecef;
-  border-radius: 8px;
-  background: #f7fbfb;
+  justify-content: space-between;
+  padding-bottom: 26px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.access-icon {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  color: #191d1b;
+  background: var(--page-amber);
+  border-radius: 50%;
+  font-size: 19px;
+}
+
+.access-icon::after {
+  position: absolute;
+  inset: -1px;
+  content: "";
+  border: 1px solid rgba(215, 146, 44, 0.7);
+  border-radius: 50%;
+  animation: access-signal 2.8s ease-out infinite;
+}
+
+.access-number {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.access-copy {
+  padding-top: 28px;
+}
+
+.access-copy > p {
+  color: var(--page-amber);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.access-copy h2 {
+  margin-top: 8px !important;
+  font-family: var(--page-display);
+  font-size: 28px;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.access-copy > span {
+  display: block;
+  margin-top: 13px;
+  color: rgba(255, 255, 255, 0.62);
   font-size: 13px;
-  font-weight: 600;
-}
-
-.quick-notes .el-icon {
-  color: #0a8e84;
-  font-size: 16px;
-}
-
-.maintenance-alert {
-  border: 1px solid #dcecf2;
-  border-radius: 8px;
-  background: #f3f8fa;
+  line-height: 1.75;
+  text-wrap: pretty;
 }
 
 .unlock-form {
-  margin-top: 24px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 138px;
-  gap: 12px;
+  margin-top: 30px;
 }
 
-.unlock-form :deep(.el-input__wrapper) {
-  min-height: 50px;
-  border-radius: 8px;
-  box-shadow: 0 0 0 1px #d9e8ee inset;
-  transition: box-shadow .2s ease, background .2s ease;
-}
-
-.unlock-form :deep(.el-input__wrapper:hover),
-.unlock-form :deep(.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 1px #8bd5e7 inset, 0 10px 28px rgba(12, 107, 138, .1);
-}
-
-.unlock-form :deep(.el-button) {
-  min-height: 50px;
-  border: 0;
-  border-radius: 8px;
+.unlock-form > label {
+  display: block;
+  margin-bottom: 9px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
   font-weight: 700;
-  background: linear-gradient(135deg, #0a88a8, #0f6f8c);
-  box-shadow: 0 14px 28px rgba(12, 107, 138, .22);
 }
 
-.unlock-form :deep(.el-button:not(.is-disabled):hover),
-.unlock-form :deep(.el-button:not(.is-disabled):focus-visible) {
-  background: linear-gradient(135deg, #0b95b9, #107c9e);
+.unlock-control {
+  display: grid;
+  gap: 10px;
 }
 
-.unlock-form :deep(.el-button.is-disabled) {
-  color: rgba(255, 255, 255, .76);
-  background: #93bfcc;
-  box-shadow: none;
+#app .maintenance-page .unlock-control :deep(.el-input__wrapper) {
+  min-height: 50px;
+  padding-inline: 15px;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-radius: 3px !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.26) inset !important;
+  transition: background-color 150ms ease-out, box-shadow 150ms ease-out;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .scan-line {
-    animation: scanMove 3.8s ease-in-out infinite;
-  }
-
-  .pulse-dot {
-    animation: pulseGlow 2.2s ease-in-out infinite;
-  }
-
-  .track-glow {
-    animation: trackGlowOrbit 6.4s cubic-bezier(.42, 0, .24, 1) infinite;
-  }
+#app .maintenance-page .unlock-control :deep(.el-input__wrapper:hover) {
+  background: rgba(255, 255, 255, 0.11) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.48) inset !important;
 }
 
-@keyframes scanMove {
-  0%, 100% {
-    transform: translateY(-78px);
-    opacity: .24;
-  }
-
-  50% {
-    transform: translateY(78px);
-    opacity: .88;
-  }
+#app .maintenance-page .unlock-control :deep(.el-input__wrapper.is-focus) {
+  background: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 0 0 2px var(--page-amber) inset !important;
 }
 
-@keyframes pulseGlow {
-  0%, 100% {
-    box-shadow: 0 0 0 7px rgba(141, 240, 191, .12), 0 0 20px rgba(141, 240, 191, .54);
-  }
-
-  50% {
-    box-shadow: 0 0 0 11px rgba(141, 240, 191, .2), 0 0 32px rgba(141, 240, 191, .88);
-  }
+#app .maintenance-page .unlock-control :deep(.el-input__inner),
+#app .maintenance-page .unlock-control :deep(.el-input__prefix),
+#app .maintenance-page .unlock-control :deep(.el-input__suffix) {
+  color: #ffffff !important;
 }
 
-@keyframes trackGlowOrbit {
-  0%, 100% {
-    opacity: .72;
-    transform: translate(-50%, -50%) translate(-76px, -34px) scale(.82);
-  }
-
-  20% {
-    opacity: .95;
-    transform: translate(-50%, -50%) translate(-18px, -55px) scale(1.02);
-  }
-
-  42% {
-    opacity: .8;
-    transform: translate(-50%, -50%) translate(72px, -12px) scale(.9);
-  }
-
-  64% {
-    opacity: 1;
-    transform: translate(-50%, -50%) translate(18px, 38px) scale(1.1);
-  }
-
-  84% {
-    opacity: .86;
-    transform: translate(-50%, -50%) translate(-64px, 16px) scale(.96);
-  }
+#app .maintenance-page .unlock-control :deep(.el-input__inner::placeholder) {
+  color: rgba(255, 255, 255, 0.4) !important;
 }
 
-@media (max-width: 860px) {
-  .maintenance-page {
-    padding: 82px 18px 28px;
-    overflow-y: auto;
-  }
-
-  .maintenance-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .visual-panel {
-    min-height: 250px;
-    padding: 26px;
-  }
-
-  .photo-frame {
-    left: 26px;
-    right: 26px;
-    bottom: 78px;
-    height: 145px;
-  }
-
-  .focus-ring {
-    inset: 36px 36%;
-  }
-
-  .panel-status {
-    left: 26px;
-    right: 26px;
-    bottom: 24px;
-  }
-
-  .access-card {
-    padding: 34px;
-  }
+#app .maintenance-page .unlock-control :deep(.el-button) {
+  min-height: 50px;
+  margin: 0;
+  gap: 8px;
+  color: #17221f !important;
+  background: var(--page-amber) !important;
+  border-color: var(--page-amber) !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  font-weight: 800;
+  transition: background-color 150ms ease-out, border-color 150ms ease-out, transform 150ms ease-out, box-shadow 150ms ease-out;
 }
 
-@media (max-width: 560px) {
-  .maintenance-page {
-    padding: 76px 14px 22px;
+#app .maintenance-page .unlock-control :deep(.el-button .el-icon) {
+  transition: transform 150ms ease-out;
+}
+
+#app .maintenance-page .unlock-control :deep(.el-button:not(.is-disabled):hover),
+#app .maintenance-page .unlock-control :deep(.el-button:not(.is-disabled):focus-visible) {
+  background: #e5a845 !important;
+  border-color: #e5a845 !important;
+  box-shadow: 0 12px 30px rgba(215, 146, 44, 0.22) !important;
+  transform: translateY(-1px);
+}
+
+#app .maintenance-page .unlock-control :deep(.el-button:not(.is-disabled):hover .el-icon),
+#app .maintenance-page .unlock-control :deep(.el-button:not(.is-disabled):focus-visible .el-icon) {
+  transform: translateX(3px);
+}
+
+#app .maintenance-page .unlock-control :deep(.el-button:not(.is-disabled):active) {
+  transform: scale(0.96);
+}
+
+#app .maintenance-page .unlock-control :deep(.el-button.is-disabled) {
+  color: rgba(255, 255, 255, 0.42) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+.unlock-hint {
+  margin-top: 9px !important;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.access-foot {
+  margin-top: 30px;
+  padding-top: 18px;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: rgba(255, 255, 255, 0.5);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.access-foot .el-icon {
+  margin-top: 2px;
+  flex: 0 0 auto;
+  color: var(--page-amber);
+  font-size: 14px;
+}
+
+.maintenance-footer {
+  position: relative;
+  z-index: 2;
+  min-height: 54px;
+  padding: 0 clamp(24px, 4vw, 64px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  color: var(--page-muted);
+  background: var(--page-surface);
+  border-top: 1px solid var(--page-line);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.maintenance-footer span:last-child {
+  color: var(--page-green);
+}
+
+@keyframes background-diagnostic-sweep {
+  0%, 14% { transform: translateX(-120%); }
+  62%, 100% { transform: translateX(calc(100vw + 120%)); }
+}
+
+@keyframes status-signal {
+  0% { opacity: 0.72; transform: scale(0.72); }
+  62%, 100% { opacity: 0; transform: scale(1.72); }
+}
+
+@keyframes service-code-active {
+  0%, 100% { opacity: 0.72; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
+}
+
+@keyframes maintenance-gear {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes progress-sweep {
+  0%, 18% { transform: translateX(-120%); }
+  72%, 100% { transform: translateX(320%); }
+}
+
+@keyframes panel-diagnostic-scan {
+  0%, 18% { opacity: 0; transform: translateY(0); }
+  28% { opacity: 1; }
+  66% { opacity: 0.7; }
+  78%, 100% { opacity: 0; transform: translateY(520%); }
+}
+
+@keyframes access-signal {
+  0%, 24% { opacity: 0.68; transform: scale(0.82); }
+  72%, 100% { opacity: 0; transform: scale(1.46); }
+}
+
+@media (max-width: 980px) {
+  .maintenance-header {
+    grid-template-columns: 1fr auto;
   }
 
-  .public-link {
-    top: 18px;
-    left: 18px;
-    min-height: 36px;
-    padding: 0 12px;
-  }
-
-  .maintenance-shell {
-    border-radius: 8px;
-  }
-
-  .visual-panel {
+  .header-status {
     display: none;
   }
 
-  .access-card {
-    padding: 28px 20px;
-  }
-
-  .status-header {
-    margin-bottom: 22px;
-  }
-
-  .quick-notes,
-  .unlock-form {
+  .maintenance-main {
+    width: min(calc(100% - 48px), 760px);
     grid-template-columns: 1fr;
+    gap: 48px;
+    padding: 56px 0 64px;
   }
 
-  .unlock-form :deep(.el-button) {
-    width: 100%;
+  .access-panel {
+    width: min(100%, 560px);
+  }
+}
+
+@media (max-width: 620px) {
+  .maintenance-header {
+    min-height: 72px;
+    padding: 12px 18px;
+  }
+
+  .brand-mark {
+    width: 40px;
+    height: 40px;
+  }
+
+  .brand-copy strong {
+    max-width: 150px;
+    font-size: 14px;
+  }
+
+  .public-link {
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+
+  .public-link span,
+  .public-link-arrow {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .maintenance-main {
+    width: calc(100% - 36px);
+    min-height: auto;
+    padding: 40px 0 52px;
+    gap: 38px;
+  }
+
+  .service-reference strong {
+    font-size: 34px;
+  }
+
+  .notice-heading {
+    padding: 28px 0 30px;
+  }
+
+  .notice-heading h1 {
+    font-size: clamp(38px, 12vw, 54px);
+  }
+
+  .maintenance-message {
+    font-size: 14px;
+    line-height: 1.75;
+  }
+
+  .service-row {
+    min-height: 84px;
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .service-copy small {
+    white-space: normal;
+  }
+
+  .service-state {
+    padding-inline: 6px;
+    font-size: 10px;
+  }
+
+  .progress-labels {
+    font-size: 9px;
+  }
+
+  .progress-labels i {
+    display: none;
+  }
+
+  .access-panel {
+    padding: 26px 22px;
+  }
+
+  .maintenance-footer {
+    min-height: 48px;
+    padding-inline: 18px;
+  }
+
+  .maintenance-footer span:first-child {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .brand-copy small {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .maintenance-page::before,
+  .status-light::after,
+  .service-reference strong,
+  .is-paused .service-icon .el-icon,
+  .progress-track span::after,
+  .access-panel::before,
+  .access-icon::after {
+    animation: none !important;
+  }
+
+  .maintenance-page::before,
+  .status-light::after,
+  .access-panel::before,
+  .access-icon::after,
+  .progress-track span::after {
+    display: none;
+  }
+
+  .service-reference,
+  .notice-heading,
+  .service-board,
+  .maintenance-progress,
+  .access-panel,
+  .progress-track span,
+  .public-link,
+  .public-link-arrow,
+  .unlock-control :deep(.el-button) {
+    transition: none !important;
   }
 }
 </style>

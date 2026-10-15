@@ -231,75 +231,116 @@
               prop="file"
               class="upload-item content-form-item"
             >
-              <el-upload
-                ref="uploadRef"
-                drag
-                :auto-upload="false"
-                :limit="1"
-                :show-file-list="false"
-                :disabled="uploading"
-                :class="{ 'has-file': fileMeta }"
-                accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm"
-                :on-change="selectFile"
-                :on-remove="removeFile"
-                :on-exceed="replaceFile"
+              <div
+                class="upload-dropzone"
+                :class="{ 'has-files': selectedEntries.length, 'is-disabled': uploading }"
+                @dragover.prevent
+                @drop.prevent="handleDrop"
               >
-                <div v-if="!fileMeta" class="upload-empty">
+                <input
+                  ref="fileInputRef"
+                  class="upload-native-input"
+                  type="file"
+                  multiple
+                  accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm"
+                  @change="handleFileInput"
+                />
+                <input
+                  ref="folderInputRef"
+                  class="upload-native-input"
+                  type="file"
+                  multiple
+                  webkitdirectory
+                  directory
+                  @change="handleFolderInput"
+                />
+
+                <div v-if="!selectedEntries.length" class="upload-empty">
                   <div class="upload-frame" aria-hidden="true">
                     <el-icon><VideoCamera /></el-icon>
                   </div>
                   <div class="upload-empty__copy">
                     <small>INGEST / 等待素材</small>
-                    <strong>拖入视频母带</strong>
-                    <span>或点击从设备选择文件</span>
+                    <strong>拖入一个或多个视频</strong>
+                    <span>多个视频或文件夹会自动整理为 ZIP</span>
                   </div>
-                  <span class="upload-browse" aria-hidden="true">
-                    <el-icon><UploadFilled /></el-icon>
-                    选择视频
-                  </span>
+                  <div class="upload-picker-actions">
+                    <el-button class="upload-browse" @click="openFilePicker">
+                      <el-icon><UploadFilled /></el-icon>
+                      <span>选择文件</span>
+                    </el-button>
+                    <el-button class="upload-folder-button" @click="openFolderPicker">
+                      <el-icon><FolderOpened /></el-icon>
+                      <span>选择文件夹</span>
+                    </el-button>
+                  </div>
                 </div>
 
                 <div v-else class="selected-file">
                   <div class="selected-file__mark" aria-hidden="true">
-                    <el-icon><VideoCamera /></el-icon>
-                    <span>01</span>
+                    <el-icon><Files v-if="selection.requiresArchive" /><VideoCamera v-else /></el-icon>
+                    <span>{{ fileCountLabel }}</span>
                   </div>
                   <div class="selected-file__body">
-                    <small>MASTER READY · {{ fileMeta.extension }}</small>
-                    <strong :title="fileMeta.name">{{ fileMeta.name }}</strong>
+                    <small>{{ selection.requiresArchive ? 'PACKAGE READY · ZIP' : `MASTER READY · ${selectedEntries[0].extension.toUpperCase()}` }}</small>
+                    <strong :title="selectionTitle">{{ selectionTitle }}</strong>
                     <div class="selected-file__meta">
-                      <span>{{ fileMeta.size }}</span>
-                      <span>{{ uploadFailed ? '传输中断' : uploading ? '正在传输' : '等待提交' }}</span>
+                      <span>{{ selectedEntries.length }} 个文件 · {{ formatUploadSize(selection.totalBytes) }}</span>
+                      <span>{{ selectedFileStatus }}</span>
                     </div>
                   </div>
                   <div v-if="!uploading" class="selected-file__actions">
-                    <el-button class="replace-file-button" @click.stop="openFilePicker">
-                      <el-icon><RefreshRight /></el-icon>
-                      <span>替换</span>
+                    <el-button class="replace-file-button" @click="openFilePicker">
+                      <el-icon><Plus /></el-icon>
+                      <span>添加文件</span>
                     </el-button>
-                    <el-tooltip content="移除视频" placement="top">
+                    <el-button class="folder-file-button" @click="openFolderPicker">
+                      <el-icon><FolderOpened /></el-icon>
+                      <span>添加文件夹</span>
+                    </el-button>
+                    <el-tooltip content="清空全部文件" placement="top">
                       <el-button
                         class="remove-file-button"
-                        aria-label="移除视频"
-                        @click.stop="removeSelectedFile"
+                        aria-label="清空全部文件"
+                        @click="clearSelectedFiles"
                       >
                         <el-icon><Delete /></el-icon>
                       </el-button>
                     </el-tooltip>
                   </div>
+
+                  <ul class="file-manifest" aria-label="已选择的视频文件">
+                    <li v-for="(entry, index) in selectedEntries" :key="entry.id">
+                      <span class="file-manifest__index">{{ String(index + 1).padStart(2, '0') }}</span>
+                      <span class="file-manifest__info">
+                        <strong :title="entry.path">{{ entry.path }}</strong>
+                        <small>{{ entry.extension.toUpperCase() }} · {{ formatUploadSize(entry.file.size) }}</small>
+                      </span>
+                      <el-tooltip content="移除此文件" placement="top">
+                        <el-button
+                          class="file-manifest__remove"
+                          :aria-label="`移除 ${entry.path}`"
+                          :disabled="uploading"
+                          @click="removeEntry(index)"
+                        >
+                          <el-icon><Close /></el-icon>
+                        </el-button>
+                      </el-tooltip>
+                    </li>
+                  </ul>
                   <FileUploadProgress
                     v-if="uploading || uploadFailed"
-                    :percentage="progress"
+                    :percentage="packing ? packingProgress : progress"
                     :status="uploadProgressStatus"
-                    subject="视频"
+                    :subject="selection.requiresArchive ? '素材包' : '视频'"
                     progress-color="#d84a36"
                   />
                 </div>
-              </el-upload>
+              </div>
 
               <div class="upload-specs" aria-label="视频上传要求">
                 <span><strong>FORMAT</strong>MP4 · MOV · WebM</span>
-                <span><strong>CAPACITY</strong>单文件最大 500MB</span>
+                <span><strong>CAPACITY</strong>合计最大 500MB · 最多 500 个</span>
                 <span><el-icon><Lock /></el-icon>文件会进入私有审核区</span>
               </div>
             </el-form-item>
@@ -316,54 +357,74 @@
               type="primary"
               size="large"
               :loading="uploading"
-              :disabled="!consent"
+              :disabled="!consent || uploading"
               @click="submit"
             >
-              <span>提交视频</span>
+              <span>{{ packing ? '正在打包' : uploading ? '正在提交' : '提交视频' }}</span>
               <el-icon><UploadFilled /></el-icon>
             </el-button>
           </div>
         </el-form>
       </section>
     </main>
+
+    <SubmissionSuccessDialog
+      v-model="successDialogVisible"
+      variant="submission"
+      :reference-number="submissionNumber"
+      @confirm="returnHome"
+    />
   </div>
 </template>
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import {
   ArrowLeft,
+  Close,
   Delete,
   DocumentChecked,
   EditPen,
+  Files,
+  FolderOpened,
   Lock,
   Message,
   Monitor,
   OfficeBuilding,
   Phone,
+  Plus,
   Promotion,
-  RefreshRight,
   UploadFilled,
   User,
   VideoCamera
 } from '@element-plus/icons-vue'
-import { genFileId } from 'element-plus'
 import request from '@/utils/request'
 import FileUploadProgress from '@/components/FileUploadProgress.vue'
+import SubmissionSuccessDialog from '@/components/SubmissionSuccessDialog.vue'
 import { getUploadPercentage } from '@/utils/uploadProgress'
+import {
+  createUploadSelection,
+  formatUploadSize,
+  prepareUploadFile
+} from '@/utils/uploadArchive'
 
 const router = useRouter()
 const formRef = ref()
-const uploadRef = ref()
-const file = ref(null)
+const fileInputRef = ref()
+const folderInputRef = ref()
+const selection = ref({ entries: [], totalBytes: 0, requiresArchive: false })
 const consent = ref(false)
 const sending = ref(false)
 const uploading = ref(false)
+const packing = ref(false)
 const uploadFailed = ref(false)
 const progress = ref(0)
+const packingProgress = ref(0)
 const countdown = ref(0)
+const successDialogVisible = ref(false)
+const submissionNumber = ref('')
 let timer
 
 const form = reactive({
@@ -400,71 +461,108 @@ const rules = {
   file: [
     {
       validator: (_rule, _value, callback) => {
-        file.value ? callback() : callback(new Error('请选择投稿视频'))
+        selectedEntries.value.length ? callback() : callback(new Error('请选择投稿视频'))
       }
     }
   ]
 }
 
-const formatFileSize = bytes => {
-  if (!bytes) return '0 MB'
-  const mb = bytes / 1024 / 1024
-  return `${mb >= 10 ? Math.round(mb) : mb.toFixed(1)} MB`
+const videoSelectionOptions = {
+  allowedExtensions: ['mp4', 'mov', 'webm'],
+  maxBytes: 500 * 1024 * 1024,
+  emptyFileMessage: '不能上传空视频',
+  unsupportedMessage: '仅支持 MP4、MOV 和 WebM',
+  sizeMessage: '所选视频总大小不能超过500MB'
 }
 
-const fileMeta = computed(() => file.value
-  ? {
-      name: file.value.name,
-      size: formatFileSize(file.value.size),
-      extension: file.value.name.split('.').pop()?.toUpperCase() || 'VIDEO'
-    }
-  : null)
+const selectedEntries = computed(() => selection.value.entries)
+const fileCountLabel = computed(() => String(selectedEntries.value.length).padStart(2, '0'))
+const selectionTitle = computed(() => selection.value.requiresArchive
+  ? `${selectedEntries.value.length} 个视频将合并为 ZIP 素材包`
+  : selectedEntries.value[0]?.path || '')
+const selectedFileStatus = computed(() => {
+  if (uploadFailed.value) return '传输中断'
+  if (packing.value) return '正在打包'
+  if (uploading.value) return '正在传输'
+  return selection.value.requiresArchive ? '提交时自动打包' : '等待提交'
+})
 
 const uploadProgressStatus = computed(() => {
+  if (packing.value) return 'packing'
   if (uploadFailed.value) return 'error'
   return progress.value >= 100 ? 'processing' : 'uploading'
 })
 
-const selectFile = uploadFile => {
+const applyFiles = files => {
+  if (uploading.value || !files?.length) return
   uploadFailed.value = false
   progress.value = 0
-  if (uploadFile.raw.size > 500 * 1024 * 1024) {
-    ElMessage.error('视频不能超过500MB')
-    removeSelectedFile()
-    return
+  packingProgress.value = 0
+
+  try {
+    const combinedFiles = [
+      ...selectedEntries.value.map(entry => entry.file),
+      ...Array.from(files)
+    ]
+    selection.value = createUploadSelection(combinedFiles, videoSelectionOptions)
+    form.file = selection.value.entries[0]?.file || null
+    formRef.value?.validateField('file')
+  } catch (error) {
+    ElMessage.error(error.message)
   }
-  if (!/\.(mp4|mov|webm)$/i.test(uploadFile.name)) {
-    ElMessage.error('仅支持MP4、MOV和WebM')
-    removeSelectedFile()
-    return
-  }
-  file.value = uploadFile.raw
-  form.file = uploadFile.raw
-  formRef.value?.validateField('file')
 }
 
-const removeFile = () => {
-  file.value = null
+const resetNativeInput = event => {
+  if (event?.target) event.target.value = ''
+}
+
+const handleFileInput = event => {
+  applyFiles(event.target.files)
+  resetNativeInput(event)
+}
+
+const handleFolderInput = event => {
+  applyFiles(event.target.files)
+  resetNativeInput(event)
+}
+
+const handleDrop = event => {
+  if (uploading.value) return
+  const containsFolder = Array.from(event.dataTransfer?.items || [])
+    .some(item => item.webkitGetAsEntry?.()?.isDirectory)
+  if (containsFolder) {
+    ElMessage.warning('拖入文件夹时浏览器无法稳定读取目录，请使用“选择文件夹”')
+    return
+  }
+  applyFiles(event.dataTransfer?.files)
+}
+
+const clearSelectedFiles = () => {
+  selection.value = { entries: [], totalBytes: 0, requiresArchive: false }
   form.file = null
   uploadFailed.value = false
   progress.value = 0
+  packingProgress.value = 0
 }
 
-const removeSelectedFile = () => {
-  uploadRef.value?.clearFiles()
-  removeFile()
+const removeEntry = index => {
+  const remainingFiles = selectedEntries.value
+    .filter((_entry, entryIndex) => entryIndex !== index)
+    .map(entry => entry.file)
+  selection.value = createUploadSelection(remainingFiles, videoSelectionOptions)
+  form.file = selection.value.entries[0]?.file || null
+  uploadFailed.value = false
+  progress.value = 0
+  packingProgress.value = 0
+  formRef.value?.validateField('file')
 }
 
 const openFilePicker = () => {
-  uploadRef.value?.$el?.querySelector('input[type="file"]')?.click()
+  if (!uploading.value) fileInputRef.value?.click()
 }
 
-const replaceFile = files => {
-  const nextFile = files[0]
-  if (!nextFile) return
-  uploadRef.value?.clearFiles()
-  nextFile.uid = genFileId()
-  uploadRef.value?.handleStart(nextFile)
+const openFolderPicker = () => {
+  if (!uploading.value) folderInputRef.value?.click()
 }
 
 const sendCode = async () => {
@@ -486,17 +584,28 @@ const submit = async () => {
   await formRef.value?.validate()
   if (!consent.value) return ElMessage.warning('请先确认投稿授权')
 
-  const data = new FormData()
-  Object.entries(form)
-    .filter(([key]) => key !== 'file')
-    .forEach(([key, value]) => data.append(key, value || ''))
-  data.append('file', file.value)
-
   uploading.value = true
+  packing.value = selection.value.requiresArchive
   uploadFailed.value = false
   progress.value = 0
+  packingProgress.value = 0
   let response
+  let requestStarted = false
   try {
+    const uploadFile = await prepareUploadFile(selection.value, {
+      archiveBaseName: 'video-submission',
+      maxBytes: videoSelectionOptions.maxBytes,
+      onProgress: percentage => { packingProgress.value = percentage }
+    })
+    packing.value = false
+
+    const data = new FormData()
+    Object.entries(form)
+      .filter(([key]) => key !== 'file')
+      .forEach(([key, value]) => data.append(key, value || ''))
+    data.append('file', uploadFile)
+
+    requestStarted = true
     response = await request.post('/submissions/public', data, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 10 * 60 * 1000,
@@ -506,20 +615,20 @@ const submit = async () => {
       }
     })
     progress.value = 100
-  } catch {
-    uploadFailed.value = true
+  } catch (error) {
+    if (requestStarted) uploadFailed.value = true
+    else ElMessage.error(error.message || '文件打包失败，请重试')
     return
   } finally {
+    packing.value = false
     uploading.value = false
   }
 
-  await ElMessageBox.alert(
-    `投稿编号：${response.data.submissionNumber}`,
-    '投稿成功',
-    { confirmButtonText: '返回首页' }
-  )
-  router.push('/')
+  submissionNumber.value = response.data.submissionNumber
+  successDialogVisible.value = true
 }
+
+const returnHome = () => router.push('/')
 
 onMounted(async () => {
   const status = await request.get('/maintenance/public/status', { silent: true })

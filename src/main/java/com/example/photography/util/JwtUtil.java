@@ -1,13 +1,16 @@
 package com.example.photography.util;
 
+import com.example.photography.model.enums.UserRole;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -36,6 +39,17 @@ public class JwtUtil {
     public String generateToken(String username, String role, Long userId, Integer tokenVersion) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", role);
+        claims.put("roles", List.of(role));
+        claims.put("userId", userId);
+        claims.put("tokenVersion", tokenVersion == null ? 0 : tokenVersion);
+        return createToken(claims, username);
+    }
+
+    public String generateToken(String username, Collection<UserRole> roles, Long userId, Integer tokenVersion) {
+        var normalizedRoles = UserRole.normalize(roles);
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("role", UserRole.highest(normalizedRoles).name());
+        claims.put("roles", normalizedRoles.stream().map(UserRole::name).toList());
         claims.put("userId", userId);
         claims.put("tokenVersion", tokenVersion == null ? 0 : tokenVersion);
         return createToken(claims, username);
@@ -96,6 +110,21 @@ public class JwtUtil {
         return claims.get("role").toString();
     }
 
+    public List<UserRole> getRolesFromToken(String token) {
+        Claims claims = getClaimsFromToken(token);
+        Object value = claims.get("roles");
+        if (value instanceof Collection<?> collection) {
+            List<UserRole> roles = collection.stream()
+                    .map(String::valueOf)
+                    .map(UserRole::valueOf)
+                    .map(UserRole::normalized)
+                    .distinct()
+                    .toList();
+            if (!roles.isEmpty()) return roles;
+        }
+        return List.of(UserRole.valueOf(getRoleFromToken(token)).normalized());
+    }
+
     public Integer getTokenVersionFromToken(String token) {
         Object value = getClaimsFromToken(token).get("tokenVersion");
         return value == null ? 0 : Integer.valueOf(value.toString());
@@ -150,10 +179,9 @@ public class JwtUtil {
         try {
             Claims claims = getClaimsFromToken(token);
             String username = claims.getSubject();
-            String role = claims.get("role").toString();
             Long userId = Long.valueOf(claims.get("userId").toString());
             Integer tokenVersion = getTokenVersionFromToken(token);
-            return generateToken(username, role, userId, tokenVersion);
+            return generateToken(username, getRolesFromToken(token), userId, tokenVersion);
         } catch (Exception e) {
             return null;
         }

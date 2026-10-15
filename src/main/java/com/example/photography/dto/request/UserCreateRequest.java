@@ -3,8 +3,11 @@ package com.example.photography.dto.request;
 import com.example.photography.model.enums.UserRole;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /**
  * 用户创建请求DTO
@@ -29,8 +32,9 @@ public class UserCreateRequest {
     
 
     
-    @NotNull(message = "用户角色不能为空")
     private UserRole role;
+
+    private Set<UserRole> roles;
     
     private Long departmentId;
     
@@ -86,6 +90,21 @@ public class UserCreateRequest {
     
     public void setRole(UserRole role) {
         this.role = role;
+    }
+
+    public Set<UserRole> getRoles() {
+        return roles;
+    }
+
+    public void setRoles(Set<UserRole> roles) {
+        this.roles = roles;
+    }
+
+    public Set<UserRole> getRequestedRoles() {
+        Collection<UserRole> requested = roles != null
+                ? roles
+                : role == null ? Set.of(UserRole.MEMBER) : Set.of(role);
+        return new LinkedHashSet<>(requested);
     }
     
     public Long getDepartmentId() {

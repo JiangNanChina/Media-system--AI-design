@@ -60,7 +60,11 @@ public class AuthServiceImpl implements AuthService {
         user.setLockedUntil(null);
         userService.save(user);
 
-        if (isOperationalRole(user.getRole()) && request.getDeviceInfo() != null) {
+        if (isOperationalRole(user.getRole()) && request.getDeviceInfo() == null) {
+            throw new RuntimeException("无法获取设备信息，请启用浏览器存储后重试");
+        }
+
+        if (isOperationalRole(user.getRole())) {
             UserDeviceService.DeviceValidationResult result = userDeviceService
                     .validateAndBindDevice(user, request.getDeviceInfo(), ipAddress, userAgent);
             if (!result.isSuccess()) {
@@ -137,16 +141,19 @@ public class AuthServiceImpl implements AuthService {
         user.setAccountStatus(AccountStatus.PENDING);
         user.setEnabled(false);
         User saved = userService.save(user);
-        return new RegisterResponse(saved.getId(), saved.getUsername(), saved.getRealName(), saved.getEmail(),
+        RegisterResponse response = new RegisterResponse(saved.getId(), saved.getUsername(), saved.getRealName(), saved.getEmail(),
                 saved.getRole(), saved.getDepartment() == null ? null : saved.getDepartment().getName(),
                 "注册申请已提交，请等待管理员审核");
+        response.setRoles(saved.getRoles());
+        return response;
     }
 
     private LoginResponse buildResponse(User user, boolean includeToken) {
-        String token = includeToken ? jwtUtil.generateToken(user.getUsername(), user.getRole().name(), user.getId(), normalizedVersion(user)) : null;
+        String token = includeToken ? jwtUtil.generateToken(user.getUsername(), user.getRoles(), user.getId(), normalizedVersion(user)) : null;
         LoginResponse response = new LoginResponse(token, user.getUsername(), user.getRealName(), user.getEmail(),
                 user.getRole(), user.getId(), user.getDepartment() == null ? null : user.getDepartment().getName(),
                 user.getAvatarUrl(), user.getCreatedAt());
+        response.setRoles(user.getRoles());
         response.setAccountStatus(user.getAccountStatus());
         return response;
     }

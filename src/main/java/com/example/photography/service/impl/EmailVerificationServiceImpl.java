@@ -5,6 +5,7 @@ import com.example.photography.model.entity.EmailVerificationCode;
 import com.example.photography.repository.EmailNotificationLogRepository;
 import com.example.photography.repository.EmailVerificationCodeRepository;
 import com.example.photography.service.EmailDeliveryService;
+import com.example.photography.service.EmailTemplateRenderer;
 import com.example.photography.service.EmailVerificationService;
 import com.example.photography.service.UserService;
 import lombok.extern.slf4j.Slf4j;

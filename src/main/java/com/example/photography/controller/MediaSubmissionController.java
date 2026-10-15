@@ -73,6 +73,13 @@ public class MediaSubmissionController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString()).body(resource);
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or authentication.authorities.?[authority == 'ROLE_ADMIN'].size() > 0")
+    public ApiResponse<Void> deletePermanently(@PathVariable Long id) {
+        service.deletePermanently(id);
+        return ApiResponse.success("视频投稿及服务器文件已永久删除");
+    }
+
     private String clientIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");
         return forwarded == null || forwarded.isBlank() ? request.getRemoteAddr() : forwarded.split(",")[0].trim();

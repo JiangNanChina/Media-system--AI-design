@@ -4,7 +4,8 @@
       ref="formRef"
       :model="form"
       :rules="rules"
-      :label-width="isMobile ? '70px' : '80px'"
+      :label-width="isMobile ? 'auto' : '88px'"
+      :label-position="isMobile ? 'top' : 'left'"
       class="checkin-form"
     >
       <!-- 选择打卡配置 -->
@@ -48,12 +49,18 @@
       </el-form-item>
 
       <!-- 二维码扫描 -->
-      <el-form-item v-if="form.checkinMethod === 'QR_CODE'" label="二维码">
+      <el-form-item
+        v-if="form.checkinMethod === 'QR_CODE'"
+        label="二维码"
+        prop="qrCode"
+        class="verification-item qr-verification-item"
+      >
         <div class="qr-scanner">
-          <el-button @click="showQRScanner = true" type="primary" size="large">
+          <el-button class="scan-button" @click="showQRScanner = true" type="primary" size="large">
             <el-icon><View /></el-icon>
-            扫描签到二维码
+            {{ form.qrCode ? '重新扫描二维码' : '扫描签到二维码' }}
           </el-button>
+          <p class="scan-hint">请扫描签到点当前展示的动态二维码</p>
           <div v-if="form.qrCode" class="qr-result-card">
             <el-icon class="success-icon"><CircleCheck /></el-icon>
             <span class="success-text">二维码已扫描</span>
@@ -66,30 +73,33 @@
             show-icon
           >
             <template #title>
-              <span>⚠️ 动态二维码签到 - 防作弊机制</span>
+              <span>动态二维码安全说明</span>
             </template>
-            <ul style="margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.8;">
-              <li><strong>二维码每60秒自动刷新</strong>，旧二维码立即失效</li>
-              <li><strong>只有最新的二维码有效</strong>，历史二维码无法使用</li>
+            <ul class="guide-list security-list">
+              <li><strong>每45秒轮换</strong>，令牌有效期为90秒，并带有服务端签名</li>
               <li>扫码后系统会自动识别签到地点和时间段</li>
-              <li><strong>严禁使用截图、拍照的二维码</strong>，必须扫描实时二维码</li>
-              <li>截图作弊将在下次刷新后被系统自动拦截</li>
+              <li>请扫描现场实时二维码，长期保存的截图无法使用</li>
+              <li>扫描后请在令牌有效期内完成提交</li>
             </ul>
           </el-alert>
         </div>
       </el-form-item>
 
       <!-- 管理员审核方式说明 -->
-      <el-form-item v-if="form.checkinMethod === 'MANUAL_AUDIT'" label="">
+      <el-form-item
+        v-if="form.checkinMethod === 'MANUAL_AUDIT'"
+        label="审核说明"
+        class="verification-item audit-verification-item"
+      >
         <el-alert
           type="info"
           :closable="false"
           show-icon
         >
           <template #title>
-            <span>📝 管理员审核签到方式</span>
+            <span>管理员审核签到</span>
           </template>
-          <ul style="margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.8;">
+          <ul class="guide-list audit-guide-list">
             <li>提交签到信息后，记录将处于"待审核"状态</li>
             <li>管理员审核通过后，签到记录生效</li>
             <li>管理员审核拒绝后，记录将标记为"缺勤"</li>
@@ -98,6 +108,11 @@
           </ul>
         </el-alert>
       </el-form-item>
+
+      <div class="supporting-section-heading" role="heading" aria-level="3">
+        <span>补充凭证</span>
+        <small>照片与备注均为选填</small>
+      </div>
 
       <!-- 拍照 -->
       <el-form-item label="照片" class="photo-item">
@@ -109,9 +124,9 @@
             accept="image/*"
             :max-count="1"
             :max-size="5 * 1024 * 1024"
-            :title="isMobile ? '拖拽或点击上传照片' : '拖拽或点击上传签到照片'"
-            :subtitle="isMobile ? '支持 jpg、png，最大 5MB' : '支持 jpg、png 格式，最大 5MB'"
-            :tips="isMobile ? ['建议拍摄学习环境照片'] : ['建议拍摄学习环境照片', '照片将作为签到凭证']"
+            title="拖拽或点击上传签到照片"
+            subtitle="支持 jpg、png 格式，最大 5MB"
+            :tips="['建议拍摄学习环境照片，作为签到凭证']"
             @success="handlePhotoUpload"
             class="photo-upload"
           />
@@ -124,8 +139,7 @@
           <el-input
             v-model="form.notes"
             type="textarea"
-            :rows="isMobile ? 2 : 3"
-            :autosize="{ minRows: 2, maxRows: 4 }"
+            :rows="6"
             placeholder="请输入备注信息（可选）"
             maxlength="500"
             show-word-limit
@@ -154,7 +168,12 @@
     <el-dialog
       v-model="showQRScanner"
       title="扫描二维码"
-      width="400px"
+      width="min(480px, calc(100vw - 32px))"
+      class="qr-scanner-dialog"
+      append-to-body
+      align-center
+      destroy-on-close
+      :close-on-click-modal="false"
       center
     >
       <QRScanner
@@ -705,10 +724,23 @@ const handleQRScanSuccess = async (result) => {
         showQRScanner.value = false
         return
       }
+
+      // 动态二维码必须由服务端签发，不能接受旧版可伪造的纯配置 JSON。
+      if (qrData.version !== 2 || !qrData.signature || !qrData.issuedAt || !qrData.expiresAt) {
+        ElMessage.warning('二维码版本已过期，请扫描现场最新二维码')
+        showQRScanner.value = false
+        return
+      }
       
       // 验证配置ID是否存在
       if (!qrData.configId) {
         ElMessage.warning('二维码配置信息不完整')
+        showQRScanner.value = false
+        return
+      }
+
+      if (Number(qrData.expiresAt) <= Date.now()) {
+        ElMessage.warning('二维码已过期，请扫描现场最新二维码')
         showQRScanner.value = false
         return
       }
@@ -757,9 +789,11 @@ const handleQRScanSuccess = async (result) => {
       }
       
     } catch (parseError) {
-      // 如果不是JSON格式，使用旧的简单验证
-      console.log('二维码不是JSON格式，使用兼容模式')
-      ElMessage.success('二维码扫描成功')
+      // 动态二维码必须是服务端签发的 JSON 令牌，不再接受旧的纯文本兼容格式。
+      form.qrCode = ''
+      ElMessage.warning('二维码格式无效，请扫描签到点当前展示的动态二维码')
+      showQRScanner.value = false
+      return
     }
     
     showQRScanner.value = false
@@ -831,8 +865,8 @@ const handleSubmit = async () => {
     
   } catch (error) {
     console.error('签到失败:', error)
-    if (error.response?.data?.message) {
-      ElMessage.error(error.response.data.message)
+    if (error.response?.data?.message || error.message) {
+      ElMessage.error(error.response?.data?.message || error.message)
     } else {
       ElMessage.error('签到失败，请重试')
     }
@@ -872,15 +906,67 @@ const loadAllConfigurations = async () => {
 </script>
 
 <style scoped>
+:global(.qr-scanner-dialog) {
+  align-self: center !important;
+  flex: 0 0 auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: calc(100vh - 32px) !important;
+  margin: 0 !important;
+  border-radius: var(--radius-xl) !important;
+}
+
+:global(.qr-scanner-dialog .el-dialog__header) {
+  padding: var(--spacing-5) var(--spacing-6) var(--spacing-3) !important;
+}
+
+:global(.qr-scanner-dialog .el-dialog__headerbtn) {
+  width: 44px;
+  height: 44px;
+}
+
+:global(.qr-scanner-dialog .el-dialog__body) {
+  max-height: none;
+  padding: var(--spacing-5) var(--spacing-6) var(--spacing-6) !important;
+  overflow-y: auto;
+}
+
 .checkin-dialog {
-  padding: 20px 0;
+  --checkin-control-height: 44px;
+  padding: 0;
 }
 
 .checkin-form {
-  max-width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.9fr);
+  gap: var(--spacing-4) var(--spacing-5);
+  width: 100%;
 }
 
-/* 打卡配置样式 */
+.checkin-form :deep(.el-form-item) {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.checkin-form :deep(.el-form-item__label) {
+  height: var(--checkin-control-height);
+  padding-right: var(--spacing-3);
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: var(--checkin-control-height);
+}
+
+.checkin-form :deep(.el-form-item__content) {
+  min-width: 0;
+  line-height: normal;
+}
+
+.checkin-form :deep(.el-select__wrapper) {
+  min-height: var(--checkin-control-height);
+  border-radius: var(--radius-md);
+}
+
 .config-item .config-select-wrapper {
   width: 100%;
 }
@@ -888,198 +974,243 @@ const loadAllConfigurations = async () => {
 .location-info {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, #f5f7fa 0%, #ecf0f3 100%);
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  overflow: hidden;
+  background: var(--color-primary-50);
+  border: 1px solid var(--color-primary-100);
+  border-radius: var(--radius-base);
   font-size: 13px;
-  color: #606266;
-  transition: all 0.3s ease;
-}
-
-.location-info:hover {
-  background: linear-gradient(135deg, #ecf0f3 0%, #e4e7ed 100%);
-  border-color: #d3d4d6;
 }
 
 .location-icon {
-  color: #409eff;
+  flex: 0 0 auto;
+  color: var(--color-primary-600);
   font-size: 16px;
 }
 
 .location-text {
+  overflow: hidden;
+  color: var(--color-text-primary);
   font-weight: 500;
-  color: #303133;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* 位置信息样式 */
-.coordinates-wrapper {
-  width: 100%;
-}
-
-.coordinates-input {
-  width: 100%;
-}
-
-.refresh-btn {
-  color: #409eff;
-  font-weight: 500;
-}
-
-.refresh-btn:hover {
-  color: #66b1ff;
-}
-
-/* 打卡方式样式 */
 .method-wrapper {
   width: 100%;
 }
 
 .method-radio-group {
-  width: 100%;
   display: flex;
-  gap: 0;
-  border-radius: 6px;
+  width: 100%;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: var(--color-background-soft);
+  border: 1px solid var(--color-primary-100);
+  border-radius: var(--radius-md);
 }
 
 .method-button {
+  position: relative;
   flex: 1;
   margin-right: 0 !important;
-  position: relative;
-}
-
-.method-button:not(:last-child)::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 1px;
-  height: 60%;
-  background: rgba(255, 255, 255, 0.3);
-  z-index: 1;
 }
 
 .method-button :deep(.el-radio-button__inner) {
-  width: 100%;
-  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  min-height: calc(var(--checkin-control-height) - 2px);
+  padding: 0 var(--spacing-3);
   border: none;
   border-radius: 0;
-  background: #f5f7fa;
-  color: #606266;
+  background: transparent;
+  color: var(--color-text-secondary);
   font-weight: 500;
-  transition: all 0.3s ease;
   box-shadow: none;
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 .method-button :deep(.el-radio-button__inner):hover {
-  background: #e6f7ff;
-  color: #409eff;
+  background: var(--color-primary-50);
+  color: var(--color-primary-700);
 }
 
 .method-button :deep(.el-radio-button__orig-radio:checked + .el-radio-button__inner) {
-  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
-  color: white;
-  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
-  border-color: #409eff;
-  transform: translateY(-1px);
+  background: var(--color-primary-500);
+  color: #fff;
+  box-shadow: none;
 }
 
 .method-button :deep(.el-radio-button__orig-radio:checked + .el-radio-button__inner):hover {
-  background: linear-gradient(135deg, #66b1ff 0%, #409eff 100%);
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
+  background: var(--color-primary-600);
 }
 
-.method-button:first-child :deep(.el-radio-button__inner) {
-  border-top-left-radius: 6px;
-  border-bottom-left-radius: 6px;
-}
-
-.method-button:last-child :deep(.el-radio-button__inner) {
-  border-top-right-radius: 6px;
-  border-bottom-right-radius: 6px;
+.method-button :deep(.el-radio-button__original-radio:focus-visible + .el-radio-button__inner) {
+  outline: 3px solid rgba(21, 158, 229, 0.28);
+  outline-offset: -3px;
 }
 
 .method-text {
   font-size: 14px;
-  font-weight: 500;
   white-space: nowrap;
 }
 
-/* 二维码扫描样式 */
+.verification-item,
+.supporting-section-heading {
+  grid-column: 1 / -1;
+}
+
+.verification-item :deep(.el-form-item__content) {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
 .qr-scanner {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--spacing-3);
   width: 100%;
 }
 
-.qr-scanner :deep(.el-button) {
-  height: 48px;
-  font-size: 15px;
-  font-weight: 500;
-  border-radius: 8px;
+.scan-button {
+  min-width: 180px;
+  height: var(--checkin-control-height);
+  border-radius: var(--radius-md);
+  font-weight: 650;
+}
+
+.scan-hint {
+  flex: 1;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .qr-result-card {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-  border: 1px solid #a7f3d0;
-  border-radius: 8px;
+  flex: 0 0 auto;
+  gap: var(--spacing-2);
+  min-height: var(--checkin-control-height);
+  padding: 0 var(--spacing-3);
+  background: #edfbf7;
+  border: 1px solid #b7eedf;
+  border-radius: var(--radius-md);
 }
 
 .success-icon {
-  font-size: 20px;
-  color: #10b981;
+  color: #168d72;
+  font-size: 18px;
 }
 
 .success-text {
-  color: #065f46;
+  color: #116d5a;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 650;
 }
 
 .qr-scanner-tip {
-  margin-top: 12px;
+  margin-top: var(--spacing-3);
 }
 
-.qr-scanner-tip :deep(.el-alert) {
-  border-radius: 8px;
+.verification-item :deep(.el-alert) {
+  align-items: flex-start;
+  padding: var(--spacing-3) var(--spacing-4);
+  border-radius: var(--radius-md);
 }
 
-.qr-scanner-tip :deep(.el-alert__title) {
+.verification-item :deep(.el-alert__icon) {
+  margin-top: 1px;
+}
+
+.verification-item :deep(.el-alert__title) {
+  color: var(--color-text-primary);
   font-size: 14px;
-  font-weight: 600;
-  color: #1f2937;
-  margin-bottom: 8px;
+  font-weight: 650;
+  line-height: 1.4;
 }
 
-/* WiFi信息样式 */
-.wifi-info {
-  width: 100%;
+.guide-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-1) var(--spacing-6);
+  margin: var(--spacing-2) 0 0;
+  padding-left: 18px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
-/* 照片上传样式 */
+.guide-list li::marker {
+  color: currentColor;
+}
+
+.supporting-section-heading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-2);
+  margin-top: var(--spacing-1);
+  padding-top: var(--spacing-4);
+  border-top: 1px solid rgba(79, 109, 130, 0.14);
+}
+
+.supporting-section-heading span {
+  color: var(--color-text-primary);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.supporting-section-heading small {
+  color: var(--color-text-placeholder);
+  font-size: 12px;
+}
+
 .photo-upload-wrapper {
   width: 100%;
 }
 
 .photo-upload {
   width: 100%;
-  margin-top: 8px;
 }
 
-/* 备注样式 */
+.photo-upload :deep(.el-upload-dragger) {
+  height: 150px;
+  border-radius: var(--radius-md) !important;
+}
+
+.photo-upload :deep(.upload-content) {
+  padding: var(--spacing-3);
+}
+
+.photo-upload :deep(.upload-icon) {
+  margin-bottom: var(--spacing-2);
+}
+
+.photo-upload :deep(.upload-icon .el-icon) {
+  font-size: 34px !important;
+}
+
+.photo-upload :deep(.upload-text) {
+  margin-bottom: var(--spacing-1);
+}
+
+.photo-upload :deep(.upload-title) {
+  margin-bottom: var(--spacing-1);
+  font-size: 14px;
+}
+
+.photo-upload :deep(.upload-subtitle) {
+  font-size: 12px;
+}
+
+.photo-upload :deep(.upload-tips) {
+  margin-top: var(--spacing-1);
+}
+
 .notes-wrapper {
   width: 100%;
 }
@@ -1088,260 +1219,135 @@ const loadAllConfigurations = async () => {
   width: 100%;
 }
 
-.wifi-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.wifi-validation {
-  margin-top: 12px;
-}
-
-/* WiFi帮助对话框样式 */
-:deep(.wifi-help-dialog) {
-  width: 600px;
-  max-width: 90vw;
-}
-
-:deep(.wifi-help-dialog .el-message-box__content) {
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-:deep(.wifi-help-dialog code) {
-  background: #f5f5f5;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 0.9em;
+.notes-input :deep(.el-textarea__inner) {
+  min-height: 150px !important;
+  border-radius: var(--radius-md);
+  line-height: 1.6;
+  resize: vertical;
 }
 
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid #f0f0f0;
-}
-
-/* 表单项间距优化 */
-.checkin-form .el-form-item {
-  margin-bottom: 24px;
-}
-
-.checkin-form .el-form-item:last-of-type {
-  margin-bottom: 16px;
-}
-
-/* 表单标签样式 */
-.checkin-form .el-form-item__label {
-  font-weight: 600;
-  color: #303133;
-  font-size: 14px;
-}
-
-/* 输入框统一样式 */
-.checkin-form .el-input,
-.checkin-form .el-select,
-.checkin-form .el-textarea {
-  font-size: 14px;
-}
-
-.checkin-form .el-input__inner,
-.checkin-form .el-textarea__inner {
-  border-radius: 6px;
-  transition: all 0.3s ease;
-}
-
-.checkin-form .el-input__inner:focus,
-.checkin-form .el-textarea__inner:focus {
-  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
-}
-
-/* 按钮组样式优化 */
-.dialog-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid #f0f0f0;
+  gap: var(--spacing-3);
+  margin-top: var(--spacing-6);
+  padding-top: var(--spacing-4);
+  border-top: 1px solid rgba(79, 109, 130, 0.14);
 }
 
 .dialog-footer .el-button {
-  min-width: 100px;
-  height: 40px;
+  min-width: 112px;
+  height: var(--checkin-control-height);
+  margin-left: 0;
+  border-radius: var(--radius-md);
   font-size: 14px;
-  font-weight: 500;
-  border-radius: 6px;
-}
-
-/* 响应式设计 */
-@media (max-width: 1024px) and (min-width: 769px) {
-  .method-radio-group {
-    gap: 0;
-  }
-  
-  .method-button :deep(.el-radio-button__inner) {
-    height: 38px;
-    font-size: 13px;
-  }
-  
-  .method-text {
-    font-size: 13px;
-  }
+  font-weight: 650;
 }
 
 @media (max-width: 768px) {
-  .checkin-dialog {
-    padding: 16px 0;
+  .checkin-form {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--spacing-4);
   }
-  
-  .checkin-form .el-form-item {
-    margin-bottom: 20px;
+
+  .verification-item,
+  .supporting-section-heading {
+    grid-column: auto;
   }
-  
-  .checkin-form .el-form-item__label {
-    font-size: 13px;
+
+  .checkin-form :deep(.el-form-item__label) {
+    height: auto;
+    margin-bottom: var(--spacing-2);
+    padding: 0;
     text-align: left !important;
-    padding-right: 8px;
+    line-height: 1.4;
   }
-  
+
   .location-info {
-    padding: 10px 12px;
-    margin-top: 10px;
-    font-size: 12px;
+    margin-top: var(--spacing-2);
   }
-  
-  .location-icon {
-    font-size: 14px;
-  }
-  
-  .method-radio-group {
-    flex-direction: column;
-    gap: 0;
-    border-radius: 8px;
-  }
-  
-  .method-button {
-    flex: none;
-    width: 100%;
-    margin-bottom: 0;
-  }
-  
-  .method-button:not(:last-child)::after {
-    display: none;
-  }
-  
-  .method-button:not(:last-child) {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-  }
-  
-  .method-button :deep(.el-radio-button__inner) {
-    height: 44px;
-    border-radius: 0;
-    width: 100%;
-    font-size: 14px;
-  }
-  
-  .method-button:first-child :deep(.el-radio-button__inner) {
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
-  }
-  
-  .method-button:last-child :deep(.el-radio-button__inner) {
-    border-top-left-radius: 0;
-    border-top-right-radius: 0;
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
-  }
-  
-  .method-button:only-child :deep(.el-radio-button__inner) {
-    border-radius: 8px;
-  }
-  
-  .method-text {
-    font-size: 14px;
-  }
-  
+
   .qr-scanner {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
+    flex-wrap: wrap;
   }
-  
-  .wifi-actions {
-    flex-direction: column;
-    gap: 8px;
+
+  .scan-hint {
+    flex-basis: 180px;
   }
-  
-  .wifi-actions .el-button {
-    width: 100%;
+
+  .guide-list {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-1);
   }
-  
+
+  .supporting-section-heading {
+    margin-top: 0;
+  }
+
   .dialog-footer {
-    flex-direction: column-reverse;
-    gap: 12px;
-    margin-top: 24px;
-    padding-top: 20px;
+    margin-top: var(--spacing-5);
   }
-  
+
   .dialog-footer .el-button {
-    width: 100%;
+    flex: 1;
+    min-width: 0;
     height: 44px;
-    font-size: 15px;
   }
 }
 
 @media (max-width: 480px) {
-  .checkin-dialog {
-    padding: 12px 0;
+  :global(.qr-scanner-dialog) {
+    width: calc(100vw - 24px) !important;
+    height: auto !important;
+    min-height: 0 !important;
+    border-radius: var(--radius-lg) !important;
   }
-  
-  .checkin-form .el-form-item {
-    margin-bottom: 18px;
+
+  :global(.qr-scanner-dialog .el-dialog__header) {
+    padding: var(--spacing-4) var(--spacing-4) var(--spacing-3) !important;
   }
-  
-  .checkin-form .el-form-item__label {
-    font-size: 12px;
-    margin-bottom: 6px;
+
+  :global(.qr-scanner-dialog .el-dialog__body) {
+    padding: var(--spacing-4) !important;
   }
-  
-  .location-info {
-    padding: 8px 10px;
-    margin-top: 8px;
-    font-size: 11px;
-    border-radius: 6px;
+
+  .checkin-form {
+    gap: var(--spacing-3);
   }
-  
-  .coordinates-input,
-  .notes-input {
-    font-size: 13px;
+
+  .qr-scanner {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--spacing-2);
   }
-  
-  .method-button :deep(.el-radio-button__inner) {
-    height: 46px;
-    font-size: 15px;
-    font-weight: 600;
+
+  .scan-button {
+    width: 100%;
   }
-  
-  .method-text {
-    font-size: 15px;
+
+  .scan-hint {
+    flex-basis: auto;
+    text-align: center;
   }
-  
-  .dialog-footer {
-    margin-top: 20px;
-    padding-top: 16px;
+
+  .qr-result-card {
+    justify-content: center;
   }
-  
-  .dialog-footer .el-button {
-    height: 46px;
-    font-size: 14px;
-    font-weight: 600;
+
+  .verification-item :deep(.el-alert) {
+    padding: var(--spacing-3);
+  }
+
+  .photo-upload :deep(.el-upload-dragger),
+  .notes-input :deep(.el-textarea__inner) {
+    min-height: 140px !important;
+    height: 140px;
+  }
+
+  .supporting-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
   }
 }
 </style>

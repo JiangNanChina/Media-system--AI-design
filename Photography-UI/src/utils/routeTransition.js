@@ -1,10 +1,31 @@
 import { readonly, ref } from 'vue'
 
 const MINIMUM_DISPLAY_MS = 420
+const ARCHIVE_TRANSITION_PATHS = new Set([
+  '/',
+  '/join-us',
+  '/submission',
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/maintenance'
+])
+
+const normalizePath = (path = '/') => {
+  const normalizedPath = path.split(/[?#]/, 1)[0].replace(/\/+$/, '')
+  return normalizedPath || '/'
+}
+
+export const usesArchiveRouteTransition = (path) => {
+  return ARCHIVE_TRANSITION_PATHS.has(normalizePath(path))
+}
+
+const initialPath = typeof window === 'undefined' ? '/' : window.location.pathname
 
 const routeTransitionActive = ref(true)
-const routeTransitionTitle = ref('正在装载画面')
+const routeTransitionTitle = ref('融媒体管理系统')
 const routeTransitionCode = ref('00')
+const routeTransitionTheme = ref(usesArchiveRouteTransition(initialPath) ? 'archive' : 'admin')
 
 let navigationId = 0
 let startedAt = Date.now()
@@ -22,6 +43,7 @@ const startRouteTransition = (to) => {
   startedAt = Date.now()
   routeTransitionTitle.value = to?.meta?.title || '正在切换画面'
   routeTransitionCode.value = String(navigationId % 100).padStart(2, '0')
+  routeTransitionTheme.value = usesArchiveRouteTransition(to?.path) ? 'archive' : 'admin'
   routeTransitionActive.value = true
   setBodyState(true)
 
@@ -57,7 +79,8 @@ const finishRouteTransition = (expectedNavigationId = navigationId, minimumDispl
 export const routeTransitionState = {
   active: readonly(routeTransitionActive),
   title: readonly(routeTransitionTitle),
-  code: readonly(routeTransitionCode)
+  code: readonly(routeTransitionCode),
+  theme: readonly(routeTransitionTheme)
 }
 
 export const setupRouteTransitions = (router) => {
@@ -84,5 +107,8 @@ export const setupRouteTransitions = (router) => {
 }
 
 export const finishInitialRouteTransition = () => {
+  // Lazy-loaded initial routes can take longer than the minimum display window
+  // before App mounts. Start that window when the overlay is actually ready.
+  if (routeTransitionActive.value) startedAt = Date.now()
   finishRouteTransition(navigationId)
 }

@@ -36,7 +36,7 @@ Photography Management System 是一套面向校园融媒体中心的综合管�
 
 - 支持待审核注册、登录锁定、密码找回、15 分钟访问令牌和 7 天旋转刷新令牌。
 - 访问令牌只保存在 Pinia 内存，刷新令牌使用哈希入库并通过 HttpOnly/Secure/SameSite Cookie 传递。
-- 用户角色包含部员、部长、主任、指导老师和系统超级管理员，权限同时在前端路由与后端接口校验。
+- 用户可拥有部员、部长、主任、指导老师和系统超级管理员中的多个角色；权限按最高角色层级计算，同级角色权限合并，并同时在前端路由与后端接口校验。
 - 支持用户头像上传、个人资料维护、修改密码、重置密码、启停账号。
 
 ### 部门与组织
@@ -389,3 +389,4 @@ npm run preview
 - 配置可信 CORS 域名，避免使用过宽的跨域策略。
 - 通过 Spring Boot Actuator 接入健康检查和监控。
 - 前端执行 `npm run build` 后，将 `Photography-UI/dist` 部署到 Nginx 或静态资源服务器，并将 `/api` 反向代理到后端服务。
+- Nginx 必须将 `client_max_body_size` 配置为至少 `510m`，否则视频投稿和入部申请作品会在到达 Spring Boot 前返回 413。可将 `config/nginx-photography.conf.example` 中的指令合并到现有站点 `server` 配置，执行 `nginx -t` 后重载 Nginx。

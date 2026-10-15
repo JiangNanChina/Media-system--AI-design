@@ -1,8 +1,11 @@
 package com.example.photography.dto.response;
 
+import com.example.photography.model.entity.User;
 import com.example.photography.model.enums.UserRole;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 /**
  * 用户响应DTO
@@ -15,6 +18,7 @@ public class UserResponse {
     private String phone;
     private String avatarUrl;
     private UserRole role;
+    private Set<UserRole> roles = new LinkedHashSet<>();
     private Boolean enabled;
     private String departmentName;
     private Long departmentId;
@@ -28,6 +32,15 @@ public class UserResponse {
                        String phone, String avatarUrl, UserRole role, Boolean enabled,
                        String departmentName, Long departmentId, LocalDateTime createdAt, 
                        LocalDateTime updatedAt) {
+        this(id, username, realName, email, phone, avatarUrl, role,
+                role == null ? Set.of() : Set.of(role), enabled, departmentName,
+                departmentId, createdAt, updatedAt);
+    }
+
+    public UserResponse(Long id, String username, String realName, String email,
+                        String phone, String avatarUrl, UserRole role, Set<UserRole> roles,
+                        Boolean enabled, String departmentName, Long departmentId,
+                        LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.username = username;
         this.realName = realName;
@@ -35,11 +48,30 @@ public class UserResponse {
         this.phone = phone;
         this.avatarUrl = avatarUrl;
         this.role = role;
+        setRoles(roles);
         this.enabled = enabled;
         this.departmentName = departmentName;
         this.departmentId = departmentId;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+    }
+
+    public static UserResponse from(User user) {
+        return new UserResponse(
+                user.getId(),
+                user.getUsername(),
+                user.getRealName(),
+                user.getEmail(),
+                user.getPhone(),
+                user.getAvatarUrl(),
+                user.getRole(),
+                user.getRoles(),
+                user.getEnabled(),
+                user.getDepartment() == null ? null : user.getDepartment().getName(),
+                user.getDepartment() == null ? null : user.getDepartment().getId(),
+                user.getCreatedAt(),
+                user.getUpdatedAt()
+        );
     }
 
     // Getters and Setters
@@ -97,6 +129,14 @@ public class UserResponse {
 
     public void setRole(UserRole role) {
         this.role = role;
+    }
+
+    public Set<UserRole> getRoles() {
+        return roles;
+    }
+
+    public void setRoles(Set<UserRole> roles) {
+        this.roles = roles == null ? new LinkedHashSet<>() : new LinkedHashSet<>(roles);
     }
 
     public Boolean getEnabled() {
